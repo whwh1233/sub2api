@@ -110,7 +110,7 @@
         <!-- ====== HERO · Magazine Typography ====== -->
         <section class="py-6 md:py-10">
           <div class="inline-block border-b border-gray-900 pb-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-gray-600 dark:border-white dark:text-dark-300">
-            ISSUE · 01 · AI API GATEWAY
+            ISSUE · 01 · ONE KEY · EVERY MODEL
           </div>
           <h1 class="mt-5 text-5xl font-black leading-[0.9] tracking-tight text-gray-900 dark:text-white md:text-7xl lg:text-[84px]">
             {{ siteName }}<span class="bg-gradient-to-r from-[#ff6b35] to-[#ff9166] bg-clip-text text-transparent">.</span>
@@ -266,7 +266,7 @@ const appStore = useAppStore()
 // Site settings - directly from appStore (already initialized from injected config)
 const siteName = computed(() => appStore.cachedPublicSettings?.site_name || appStore.siteName || 'Sub2API')
 const siteLogo = computed(() => appStore.cachedPublicSettings?.site_logo || appStore.siteLogo || '')
-const siteSubtitle = computed(() => appStore.cachedPublicSettings?.site_subtitle || 'AI API Gateway Platform')
+const siteSubtitle = computed(() => appStore.cachedPublicSettings?.site_subtitle || 'One Key · Every Model')
 const docUrl = computed(() => appStore.cachedPublicSettings?.doc_url || appStore.docUrl || '')
 const homeContent = computed(() => appStore.cachedPublicSettings?.home_content || '')
 
