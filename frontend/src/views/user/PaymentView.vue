@@ -41,6 +41,15 @@
         </template>
         <!-- Tab content (select phase) -->
         <template v-else>
+          <!-- Help Image + Text (manual payment – shown prominently at top) -->
+          <div v-if="checkout.help_text || checkout.help_image_url" class="card p-6">
+            <div class="flex flex-col items-center gap-4">
+              <img v-if="checkout.help_image_url" :src="checkout.help_image_url" alt=""
+                class="h-72 max-w-full cursor-pointer rounded-lg object-contain transition-opacity hover:opacity-80 md:h-80"
+                @click="previewImage = checkout.help_image_url" />
+              <p v-if="checkout.help_text" class="whitespace-pre-line text-center text-sm leading-relaxed text-gray-600 dark:text-gray-300">{{ checkout.help_text }}</p>
+            </div>
+          </div>
           <!-- Top-up Tab -->
           <template v-if="activeTab === 'recharge'">
             <!-- Recharge Account Card -->
@@ -49,7 +58,7 @@
               <p class="mt-1 text-base font-semibold text-gray-900 dark:text-white">{{ user?.username || '' }}</p>
               <p class="mt-0.5 text-sm font-medium text-green-600 dark:text-green-400">{{ t('payment.currentBalance') }}: {{ user?.balance?.toFixed(2) || '0.00' }}</p>
             </div>
-            <div v-if="enabledMethods.length === 0" class="card py-16 text-center">
+            <div v-if="enabledMethods.length === 0 && !checkout.help_text && !checkout.help_image_url" class="card py-16 text-center">
               <p class="text-gray-500 dark:text-gray-400">{{ t('payment.notAvailable') }}</p>
             </div>
             <template v-else>
@@ -224,14 +233,6 @@
             </template>
           </template>
         </template>
-        <div v-if="(checkout.help_text || checkout.help_image_url) && paymentPhase === 'select' && !selectedPlan" class="card p-4">
-          <div class="flex flex-col items-center gap-3">
-            <img v-if="checkout.help_image_url" :src="checkout.help_image_url" alt=""
-              class="h-40 max-w-full cursor-pointer rounded-lg object-contain transition-opacity hover:opacity-80"
-              @click="previewImage = checkout.help_image_url" />
-            <p v-if="checkout.help_text" class="text-center text-sm text-gray-500 dark:text-gray-400">{{ checkout.help_text }}</p>
-          </div>
-        </div>
       </template>
     </div>
     <!-- Renewal Plan Selection Modal -->
