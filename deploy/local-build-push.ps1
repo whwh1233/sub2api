@@ -29,7 +29,7 @@ $env:GOOS = "linux"
 $env:GOARCH = "amd64"
 $env:CGO_ENABLED = "0"
 try {
-    go build -o sub2api-linux ./cmd/server/
+    go build -tags=embed -ldflags="-s -w" -o sub2api-linux ./cmd/server/
     if ($LASTEXITCODE -ne 0) { throw "go build 失败" }
 } finally {
     Remove-Item Env:GOOS, Env:GOARCH, Env:CGO_ENABLED -ErrorAction SilentlyContinue
