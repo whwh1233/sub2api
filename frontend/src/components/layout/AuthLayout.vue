@@ -13,8 +13,8 @@
         <!-- Top: Logo + name -->
         <template v-if="settingsLoaded">
           <div class="flex items-center gap-3">
-            <div class="flex h-9 w-9 items-center justify-center overflow-hidden rounded-xl border border-[#ebe6dc] bg-white p-1 shadow-sm dark:border-dark-700 dark:bg-white">
-              <img :src="siteLogo || '/logo.png'" alt="Logo" class="h-full w-full object-contain" />
+            <div class="h-9 w-9 overflow-hidden rounded-xl shadow-sm">
+              <img :src="siteLogo || '/logo.png'" alt="Logo" class="h-full w-full object-cover" />
             </div>
             <span class="text-base font-bold text-gray-900 dark:text-white">{{ siteName }}</span>
           </div>
