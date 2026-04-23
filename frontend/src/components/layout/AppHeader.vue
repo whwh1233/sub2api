@@ -65,9 +65,15 @@
             aria-label="User Menu"
           >
             <div
-              class="flex h-8 w-8 items-center justify-center rounded-xl border border-[#ebe6dc] bg-[#faf7f0] text-sm font-bold text-[#ff6b35] shadow-sm dark:border-transparent dark:bg-[#1c1917]"
+              class="flex h-8 w-8 items-center justify-center overflow-hidden rounded-xl border border-[#ebe6dc] bg-[#faf7f0] text-sm font-bold text-[#ff6b35] shadow-sm dark:border-transparent dark:bg-[#1c1917]"
             >
-              {{ userInitials }}
+              <img
+                v-if="avatarUrl"
+                :src="avatarUrl"
+                :alt="displayName"
+                class="h-full w-full object-cover"
+              >
+              <span v-else>{{ userInitials }}</span>
             </div>
             <div class="hidden text-left md:block">
               <div class="text-sm font-medium text-gray-900 dark:text-white">
@@ -222,6 +228,7 @@ const dropdownOpen = ref(false)
 const dropdownRef = ref<HTMLElement | null>(null)
 const contactInfo = computed(() => appStore.contactInfo)
 const docUrl = computed(() => appStore.docUrl)
+const avatarUrl = computed(() => user.value?.avatar_url?.trim() || '')
 
 // 只在标准模式的管理员下显示新手引导按钮
 const showOnboardingButton = computed(() => {
