@@ -29,7 +29,7 @@ if [ "${1:-}" = "rollback" ]; then
     chmod +x "$BINARY"
     systemctl start "$SERVICE"
     sleep 2
-    systemctl status "$SERVICE" --no-pager | head -10
+    systemctl status "$SERVICE" --no-pager | sed -n '1,10p'
     echo ""
     echo "✓ 已回滚。当前跑的是备份版本，如需重新部署，再跑一次本脚本（不带 rollback 参数）"
     exit 0
@@ -89,7 +89,7 @@ fi
 
 echo ""
 echo "=========================="
-systemctl status "$SERVICE" --no-pager | head -12
+systemctl status "$SERVICE" --no-pager | sed -n '1,12p'
 echo "=========================="
 echo ""
 echo "✓ 部署完成"
