@@ -30,3 +30,10 @@ describe('AppSidebar header styles', () => {
     expect(sidebarBrandBlockMatch?.[0]).not.toContain('overflow: hidden;')
   })
 })
+
+describe('AppSidebar community navigation', () => {
+  it('links users to the community page', () => {
+    expect(componentSource).toContain("path: '/community'")
+    expect(componentSource).toContain("label: t('nav.community')")
+  })
+})

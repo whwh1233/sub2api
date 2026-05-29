@@ -388,6 +388,19 @@ export default {
     channelMonitor: '渠道监控',
     channelStatus: '渠道状态',
     riskControl: '风控中心',
+    community: '交流群',
+  },
+
+  // Community
+  community: {
+    title: '加入交流群 / 联系我',
+    description: '欢迎加入我们的社群，遇到问题可以在群内反馈，也会同步最新更新与活动。',
+    introTitle: '欢迎加入我们的社群',
+    introText: '遇到问题可以在群内反馈，也会同步最新更新与活动。',
+    tipTitle: '温馨提示',
+    tipText: '群内禁止发布广告、外链与无关内容。如需反馈 Bug 或建议，请尽量附带截图与复现步骤，我们会尽快响应。',
+    qrCaption: '微信扫码加入 CloseAI 天使用户服务群',
+    scanHint: '二维码有效期以图片内提示为准。',
   },
 
   // Auth

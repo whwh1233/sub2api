@@ -388,6 +388,19 @@ export default {
     channelMonitor: 'Channel Monitor',
     channelStatus: 'Channel Status',
     riskControl: 'Risk Control',
+    community: 'Community',
+  },
+
+  // Community
+  community: {
+    title: 'Join the Community / Contact Me',
+    description: 'Join our community to report issues, follow updates, and hear about new activities.',
+    introTitle: 'Join our community',
+    introText: 'If you run into problems, you can share feedback in the group. We will also post the latest updates and activities there.',
+    tipTitle: 'Friendly Reminder',
+    tipText: 'Please do not post ads, external links, or unrelated content. For bug reports or suggestions, include screenshots and reproduction steps when possible so we can respond faster.',
+    qrCaption: 'Scan with WeChat to join the CloseAI angel user service group',
+    scanHint: 'Please refer to the validity note shown in the QR code image.',
   },
 
   // Auth
