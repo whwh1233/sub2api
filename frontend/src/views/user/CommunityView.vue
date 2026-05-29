@@ -1,6 +1,6 @@
 <template>
   <AppLayout>
-    <section class="mx-auto flex min-h-[calc(100dvh-7rem)] max-w-7xl flex-col gap-5">
+    <section class="mx-auto max-w-7xl space-y-5">
       <header class="space-y-4">
         <div class="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
           <div>
@@ -51,15 +51,15 @@
         </div>
       </header>
 
-      <div data-test="community-qr-grid" class="grid flex-1 gap-5 lg:grid-cols-3">
+      <div data-test="community-qr-grid" class="grid items-stretch gap-5 lg:grid-cols-[1.08fr_1.08fr_0.78fr]">
         <figure
           v-for="channel in communityChannels"
           :key="channel.key"
           data-test="community-qr-card"
-          class="card flex min-h-[520px] flex-col overflow-hidden p-4 md:p-5 lg:min-h-0"
+          class="card flex h-full flex-col overflow-hidden p-4 md:p-5"
         >
-          <div class="flex items-center justify-between gap-3 pb-4">
-            <div>
+          <div class="flex items-start justify-between gap-3 pb-3">
+            <div class="min-w-0">
               <h2 class="text-lg font-semibold text-gray-950 dark:text-white">
                 {{ t(channel.titleKey) }}
               </h2>
@@ -72,17 +72,17 @@
             </span>
           </div>
 
-          <div class="flex min-h-[380px] flex-1 items-center justify-center rounded-2xl border border-gray-100 bg-gray-50 p-3 dark:border-dark-700 dark:bg-white">
+          <div :class="channel.shellClass">
             <img
               :src="channel.qr"
               :alt="channel.alt"
-              class="h-full max-h-[72vh] w-full max-w-[520px] rounded-xl object-contain"
+              :class="channel.imageClass"
               loading="lazy"
             />
           </div>
 
-          <figcaption class="pt-4 text-center">
-            <p class="text-sm font-medium leading-6 text-gray-700 dark:text-dark-200">
+          <figcaption class="mt-auto pt-4 text-center">
+            <p class="break-words text-sm font-medium leading-6 text-gray-700 dark:text-dark-200">
               {{ t(channel.hintKey) }}
             </p>
           </figcaption>
@@ -110,6 +110,8 @@ const communityChannels = [
     hintKey: 'community.channels.wechat.hint',
     qr: wechatQr,
     alt: 'CloseAI 天使用户服务群二维码',
+    shellClass: 'flex h-[clamp(320px,42vw,680px)] items-center justify-center rounded-2xl border border-gray-100 bg-white p-2 shadow-inner dark:border-dark-700 dark:bg-white',
+    imageClass: 'mx-auto max-h-full w-full max-w-[560px] rounded-xl object-contain',
   },
   {
     key: 'qq',
@@ -118,6 +120,8 @@ const communityChannels = [
     hintKey: 'community.channels.qq.hint',
     qr: qqQr,
     alt: 'CloseAI 使用答疑群二维码',
+    shellClass: 'flex h-[clamp(320px,42vw,680px)] items-center justify-center rounded-2xl border border-gray-100 bg-white p-2 shadow-inner dark:border-dark-700 dark:bg-white',
+    imageClass: 'mx-auto max-h-full w-full max-w-[560px] rounded-xl object-contain',
   },
   {
     key: 'telegram',
@@ -126,6 +130,8 @@ const communityChannels = [
     hintKey: 'community.channels.telegram.hint',
     qr: telegramQr,
     alt: 'CloseAI Telegram 交流群二维码',
+    shellClass: 'flex h-[clamp(320px,42vw,680px)] items-center justify-center rounded-2xl border border-gray-100 bg-white p-5 shadow-inner dark:border-dark-700 dark:bg-white md:p-7',
+    imageClass: 'mx-auto max-h-full w-full max-w-[390px] rounded-xl object-contain',
   },
 ] as const
 </script>
