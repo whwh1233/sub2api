@@ -537,6 +537,106 @@ func TestUsageLogRepositoryGetUserSpendingRanking(t *testing.T) {
 	require.NoError(t, mock.ExpectationsWereMet())
 }
 
+func TestUsageLogRepositoryGetDailyLeaderboard(t *testing.T) {
+	db, mock := newSQLMock(t)
+	repo := &usageLogRepository{sql: db}
+
+	start := time.Date(2026, 5, 29, 0, 0, 0, 0, time.Local)
+	end := start.Add(24 * time.Hour)
+	currentUserID := int64(4)
+
+	rows := sqlmock.NewRows([]string{"rank", "user_id", "username", "email", "requests", "total_tokens"}).
+		AddRow(int64(1), int64(2), "beta", "beta@example.com", int64(9), int64(900)).
+		AddRow(int64(2), int64(1), "", "alpha@example.com", int64(8), int64(800)).
+		AddRow(int64(3), int64(3), "", "", int64(5), int64(300)).
+		AddRow(int64(4), currentUserID, "me", "me@example.com", int64(2), int64(100))
+
+	mock.ExpectQuery("ul\\.user_id IS NOT NULL").
+		WithArgs(start, end, 3, currentUserID).
+		WillReturnRows(rows)
+
+	got, err := repo.GetDailyLeaderboard(context.Background(), start, end, currentUserID, 3)
+	require.NoError(t, err)
+	require.Equal(t, "beta", got.Top[0].DisplayName)
+	require.Equal(t, "a***@e***.com", got.Top[1].DisplayName)
+	require.Equal(t, "User #3", got.Top[2].DisplayName)
+	require.Equal(t, int64(900), got.Top[0].TotalTokens)
+	require.Equal(t, int64(8), got.Top[1].Requests)
+	require.False(t, got.Top[0].IsCurrentUser)
+	require.Equal(t, currentUserID, got.Me.UserID)
+	require.Equal(t, "me", got.Me.DisplayName)
+	require.Equal(t, int64(4), *got.Me.Rank)
+	require.Equal(t, int64(201), got.Me.TokensToTopThree)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestUsageLogRepositoryDailyLeaderboardGapUsesTopThreeWhenReturningTopTen(t *testing.T) {
+	db, mock := newSQLMock(t)
+	repo := &usageLogRepository{sql: db}
+
+	start := time.Date(2026, 5, 29, 0, 0, 0, 0, time.Local)
+	end := start.Add(24 * time.Hour)
+	currentUserID := int64(11)
+
+	rows := sqlmock.NewRows([]string{"rank", "user_id", "username", "email", "requests", "total_tokens"})
+	for rank := int64(1); rank <= 10; rank++ {
+		totalTokens := int64(1100 - rank*100)
+		if rank == 10 {
+			totalTokens = 100
+		}
+		rows.AddRow(rank, rank, "", fmt.Sprintf("runner-%d@example.com", rank), int64(20-rank), totalTokens)
+	}
+	rows.AddRow(int64(11), currentUserID, "me", "me@example.com", int64(1), int64(100))
+
+	mock.ExpectQuery("ul\\.user_id IS NOT NULL").
+		WithArgs(start, end, 10, currentUserID).
+		WillReturnRows(rows)
+
+	got, err := repo.GetDailyLeaderboard(context.Background(), start, end, currentUserID, 10)
+	require.NoError(t, err)
+	require.Len(t, got.Top, 10)
+	require.Equal(t, int64(800), got.Top[2].TotalTokens)
+	require.Equal(t, int64(100), got.Top[9].TotalTokens)
+	require.Equal(t, int64(11), *got.Me.Rank)
+	require.Equal(t, int64(701), got.Me.TokensToTopThree)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestMaskLeaderboardEmailMasksDomainButKeepsCommonSuffixes(t *testing.T) {
+	tests := []struct {
+		name  string
+		email string
+		want  string
+	}{
+		{
+			name:  "com suffix stays readable",
+			email: "alpha@example.com",
+			want:  "a***@e***.com",
+		},
+		{
+			name:  "cn suffix stays readable",
+			email: "beta@mail.example.cn",
+			want:  "b***@m***.e***.cn",
+		},
+		{
+			name:  "com cn suffix labels stay readable",
+			email: "gamma@example.com.cn",
+			want:  "g***@e***.com.cn",
+		},
+		{
+			name:  "other suffix is masked",
+			email: "delta@example.net",
+			want:  "d***@e***.n***",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Equal(t, tt.want, maskLeaderboardEmail(tt.email))
+		})
+	}
+}
+
 func TestBuildRequestTypeFilterConditionLegacyFallback(t *testing.T) {
 	tests := []struct {
 		name      string

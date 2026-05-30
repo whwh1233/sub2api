@@ -350,6 +350,7 @@ export default {
     announcements: '公告',
     apiKeys: 'API 密钥',
     usage: '使用记录',
+    dailyLeaderboard: '每日榜单',
     redeem: '兑换',
     affiliate: '邀请返利',
     affiliateManagement: '邀请返利',
@@ -620,6 +621,39 @@ export default {
     invalidResetLinkHint: '此密码重置链接无效或已过期。请重新请求一个新链接。',
     requestNewResetLink: '请求新的重置链接',
     invalidOrExpiredToken: '密码重置链接无效或已过期。请重新请求一个新链接。'
+  },
+
+  // 每日榜单
+  leaderboard: {
+    title: '每日榜单',
+    description: '看看今日 Token 使用排名，冲击前三名。',
+    today: '今日',
+    refresh: '刷新',
+    refreshing: '刷新中',
+    topThree: '前三名',
+    topTotal: '前三合计',
+    entryPace: '上榜门槛',
+    champion: '冠军',
+    runnerUp: '亚军',
+    thirdPlace: '季军',
+    chasingBoard: '追赶榜',
+    chasingBoardDescription: '第 4-10 名正在冲击领奖台。',
+    topTen: 'Top 10',
+    tokensBehindTopThree: '距离领奖台 {tokens} Token',
+    myRank: '我的排名',
+    currentUser: '你',
+    rank: '排名',
+    tokens: 'Token',
+    requests: '请求',
+    notRanked: '暂未上榜',
+    tokensToTopThree: '距离前三还差 {tokens} Token',
+    onLeaderboard: '你已在榜单中',
+    emptyTitle: '今日暂无用量',
+    emptyDescription: '开始调用 API 后就能参与今日榜单。',
+    loadFailed: '加载榜单失败',
+    loadFailedDetail: '暂时拿不到最新数据，可以留在当前页面重试。',
+    fullTokens: '完整值 {tokens} Token',
+    retry: '重试'
   },
 
   // Dashboard

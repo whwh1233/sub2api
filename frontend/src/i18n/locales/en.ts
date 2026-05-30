@@ -350,6 +350,7 @@ export default {
     announcements: 'Announcements',
     apiKeys: 'API Keys',
     usage: 'Usage',
+    dailyLeaderboard: 'Daily Ranking',
     redeem: 'Redeem',
     affiliate: 'Affiliate Rebates',
     affiliateManagement: 'Affiliate Rebates',
@@ -621,6 +622,39 @@ export default {
     invalidResetLinkHint: 'This password reset link is invalid or has expired. Please request a new one.',
     requestNewResetLink: 'Request New Reset Link',
     invalidOrExpiredToken: 'The password reset link is invalid or has expired. Please request a new one.'
+  },
+
+  // Daily Leaderboard
+  leaderboard: {
+    title: 'Daily Ranking',
+    description: "Compete on today's token usage and see how close you are to the top three.",
+    today: 'Today',
+    refresh: 'Refresh',
+    refreshing: 'Refreshing',
+    topThree: 'Top 3',
+    topTotal: 'Top 3 total',
+    entryPace: 'Entry pace',
+    champion: 'Champion',
+    runnerUp: 'Runner-up',
+    thirdPlace: 'Third place',
+    chasingBoard: 'Chase Board',
+    chasingBoardDescription: 'Ranks 4-10 are pushing for the podium.',
+    topTen: 'Top 10',
+    tokensBehindTopThree: '{tokens} tokens from the podium',
+    myRank: 'My Rank',
+    currentUser: 'You',
+    rank: 'Rank',
+    tokens: 'Tokens',
+    requests: 'Requests',
+    notRanked: 'Not ranked yet',
+    tokensToTopThree: '{tokens} tokens to Top 3',
+    onLeaderboard: 'You are on the leaderboard',
+    emptyTitle: 'No usage today',
+    emptyDescription: 'Start making API requests to appear here.',
+    loadFailed: 'Failed to load leaderboard',
+    loadFailedDetail: 'The latest data is temporarily unavailable. You can retry without leaving this page.',
+    fullTokens: '{tokens} tokens total',
+    retry: 'Retry'
   },
 
   // Dashboard

@@ -4,11 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	dbent "github.com/Wei-Shaw/sub2api/ent"
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/pagination"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/timezone"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/usagestats"
 )
 
@@ -58,15 +60,21 @@ type UsageService struct {
 	userRepo             UserRepository
 	entClient            *dbent.Client
 	authCacheInvalidator APIKeyAuthCacheInvalidator
+
+	now                       func() time.Time
+	dailyLeaderboardCacheMu   sync.Mutex
+	dailyLeaderboardCacheByID map[dailyLeaderboardCacheKey]dailyLeaderboardCacheEntry
 }
 
 // NewUsageService 创建使用统计服务实例
 func NewUsageService(usageRepo UsageLogRepository, userRepo UserRepository, entClient *dbent.Client, authCacheInvalidator APIKeyAuthCacheInvalidator) *UsageService {
 	return &UsageService{
-		usageRepo:            usageRepo,
-		userRepo:             userRepo,
-		entClient:            entClient,
-		authCacheInvalidator: authCacheInvalidator,
+		usageRepo:                 usageRepo,
+		userRepo:                  userRepo,
+		entClient:                 entClient,
+		authCacheInvalidator:      authCacheInvalidator,
+		now:                       time.Now,
+		dailyLeaderboardCacheByID: make(map[dailyLeaderboardCacheKey]dailyLeaderboardCacheEntry),
 	}
 }
 
@@ -269,6 +277,117 @@ func (s *UsageService) GetDailyStats(ctx context.Context, userID int64, days int
 	}
 
 	return stats, nil
+}
+
+const (
+	dailyLeaderboardLimit    = 10
+	dailyLeaderboardCacheTTL = time.Minute
+)
+
+type dailyLeaderboardCacheKey struct {
+	userID   int64
+	date     string
+	timezone string
+}
+
+type dailyLeaderboardCacheEntry struct {
+	expiresAt time.Time
+	response  *usagestats.DailyLeaderboardResponse
+}
+
+// GetDailyLeaderboard returns today's token leaderboard and current-user summary.
+func (s *UsageService) GetDailyLeaderboard(ctx context.Context, currentUserID int64) (*usagestats.DailyLeaderboardResponse, error) {
+	startTime := timezone.Today()
+	endTime := startTime.AddDate(0, 0, 1)
+	date := startTime.Format("2006-01-02")
+	tz := timezone.Name()
+	now := s.currentTime()
+	cacheKey := dailyLeaderboardCacheKey{
+		userID:   currentUserID,
+		date:     date,
+		timezone: tz,
+	}
+
+	if cached, ok := s.getDailyLeaderboardCache(cacheKey, now); ok {
+		return cached, nil
+	}
+
+	leaderboard, err := s.usageRepo.GetDailyLeaderboard(ctx, startTime, endTime, currentUserID, dailyLeaderboardLimit)
+	if err != nil {
+		return nil, fmt.Errorf("get daily leaderboard: %w", err)
+	}
+	leaderboard.Date = date
+	leaderboard.Timezone = tz
+	s.setDailyLeaderboardCache(cacheKey, now, now.Add(dailyLeaderboardCacheTTL), leaderboard)
+	return leaderboard, nil
+}
+
+func (s *UsageService) currentTime() time.Time {
+	if s.now == nil {
+		return time.Now()
+	}
+	return s.now()
+}
+
+func (s *UsageService) getDailyLeaderboardCache(key dailyLeaderboardCacheKey, now time.Time) (*usagestats.DailyLeaderboardResponse, bool) {
+	s.dailyLeaderboardCacheMu.Lock()
+	defer s.dailyLeaderboardCacheMu.Unlock()
+
+	entry, ok := s.dailyLeaderboardCacheByID[key]
+	if !ok {
+		return nil, false
+	}
+	if !now.Before(entry.expiresAt) {
+		delete(s.dailyLeaderboardCacheByID, key)
+		return nil, false
+	}
+	return cloneDailyLeaderboardResponse(entry.response), true
+}
+
+func (s *UsageService) setDailyLeaderboardCache(key dailyLeaderboardCacheKey, now, expiresAt time.Time, response *usagestats.DailyLeaderboardResponse) {
+	s.dailyLeaderboardCacheMu.Lock()
+	defer s.dailyLeaderboardCacheMu.Unlock()
+
+	if s.dailyLeaderboardCacheByID == nil {
+		s.dailyLeaderboardCacheByID = make(map[dailyLeaderboardCacheKey]dailyLeaderboardCacheEntry)
+	}
+	s.purgeExpiredDailyLeaderboardCacheLocked(now)
+	s.dailyLeaderboardCacheByID[key] = dailyLeaderboardCacheEntry{
+		expiresAt: expiresAt,
+		response:  cloneDailyLeaderboardResponse(response),
+	}
+}
+
+func (s *UsageService) purgeExpiredDailyLeaderboardCacheLocked(now time.Time) {
+	for key, entry := range s.dailyLeaderboardCacheByID {
+		if !now.Before(entry.expiresAt) {
+			delete(s.dailyLeaderboardCacheByID, key)
+		}
+	}
+}
+
+func cloneDailyLeaderboardResponse(response *usagestats.DailyLeaderboardResponse) *usagestats.DailyLeaderboardResponse {
+	if response == nil {
+		return nil
+	}
+	clone := *response
+	if response.Top != nil {
+		clone.Top = make([]usagestats.DailyLeaderboardItem, len(response.Top))
+		for i, item := range response.Top {
+			clone.Top[i] = cloneDailyLeaderboardItem(item)
+		}
+	}
+	clone.Me.DailyLeaderboardItem = cloneDailyLeaderboardItem(response.Me.DailyLeaderboardItem)
+	return &clone
+}
+
+func cloneDailyLeaderboardItem(item usagestats.DailyLeaderboardItem) usagestats.DailyLeaderboardItem {
+	clone := item
+	if item.Rank != nil {
+		rank := *item.Rank
+		clone.Rank = &rank
+	}
+	return clone
 }
 
 // Delete 删除使用日志（管理员功能，谨慎使用）

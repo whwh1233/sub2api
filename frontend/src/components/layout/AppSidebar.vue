@@ -187,6 +187,7 @@ import { useAdminSettingsStore, useAppStore, useAuthStore, useOnboardingStore } 
 import VersionBadge from '@/components/common/VersionBadge.vue'
 import { sanitizeSvg } from '@/utils/sanitize'
 import { FeatureFlags, makeSidebarFlag } from '@/utils/featureFlags'
+import type { CustomMenuItem } from '@/types'
 
 interface NavItem {
   path: string
@@ -288,6 +289,31 @@ const ChartIcon = {
           'stroke-linecap': 'round',
           'stroke-linejoin': 'round',
           d: 'M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z'
+        })
+      ]
+    )
+}
+
+const RacingLeaderboardIcon = {
+  render: () =>
+    h(
+      'svg',
+      { fill: 'none', viewBox: '0 0 24 24', stroke: 'currentColor', 'stroke-width': '1.7' },
+      [
+        h('path', {
+          'stroke-linecap': 'round',
+          'stroke-linejoin': 'round',
+          d: 'M6.25 19.25v-4.5a1 1 0 011-1h2.25v5.5m0 0v-7.75a1 1 0 011-1h3a1 1 0 011 1v7.75m0 0v-5.5h2.25a1 1 0 011 1v4.5M5.25 19.25h13.5'
+        }),
+        h('path', {
+          'stroke-linecap': 'round',
+          'stroke-linejoin': 'round',
+          d: 'M8 8.75l1.75-4 2.25 2.5 2.25-2.5 1.75 4H8zM9.25 11.25h5.5'
+        }),
+        h('path', {
+          'stroke-linecap': 'round',
+          'stroke-linejoin': 'round',
+          d: 'M3.25 15.75h2M2.75 12.25h3M18.25 12.25h3'
         })
       ]
     )
@@ -654,34 +680,78 @@ const flagRiskControl = makeSidebarFlag(FeatureFlags.riskControl)
 const flagOpsMonitoring = () => adminSettingsStore.opsMonitoringEnabled
 const flagAdminPayment = () => adminSettingsStore.paymentEnabled
 
+function normalizeSidebarLabel(label: string): string {
+  return label.trim().replace(/\s+/g, '').toLowerCase()
+}
+
+const rechargeCustomMenuLabels = new Set(
+  ['充值', '充值/订阅', 'recharge', 'recharge/subscription'].map(normalizeSidebarLabel)
+)
+const mediaPricingCustomMenuLabels = new Set(
+  ['AI生图', 'AI绘图', 'AI图片', '模型价格', 'AI Images', 'AI Generation', 'Model Pricing', 'Model Prices'].map(normalizeSidebarLabel)
+)
+
+function toCustomNavItem(item: CustomMenuItem): NavItem {
+  return {
+    path: `/custom/${item.id}`,
+    label: item.label,
+    icon: null,
+    iconSvg: item.icon_svg,
+  }
+}
+
+function splitCustomMenuNavItems(items: CustomMenuItem[]): {
+  recharge: NavItem[]
+  mediaPricing: NavItem[]
+  other: NavItem[]
+} {
+  const recharge: NavItem[] = []
+  const mediaPricing: NavItem[] = []
+  const other: NavItem[] = []
+
+  for (const item of items) {
+    const label = normalizeSidebarLabel(item.label)
+    const navItem = toCustomNavItem(item)
+
+    if (rechargeCustomMenuLabels.has(label)) {
+      recharge.push(navItem)
+    } else if (mediaPricingCustomMenuLabels.has(label)) {
+      mediaPricing.push(navItem)
+    } else {
+      other.push(navItem)
+    }
+  }
+
+  return { recharge, mediaPricing, other }
+}
+
 // buildSelfNavItems 构造用户自己的导航项（用户端主菜单和管理员的"我的账户"子菜单共享这组声明）。
 // withDashboard=true 时包含仪表盘（用户端），false 时不含（管理员的个人区已经有独立仪表盘入口）。
 //
-// 条目顺序：密钥 → 用量 → 可用渠道 → 渠道状态 → 订阅/支付 → 兑换/资料。
-// 可用渠道紧挨渠道状态之上，让用户"先看自己能用什么、再看对应状态"。
+// 条目顺序：常用操作 → 社群 → 充值/兑换 → 订阅/自定义 → AI/价格 → 渠道 → 返利/资料。
 function buildSelfNavItems(withDashboard: boolean): NavItem[] {
   const items: NavItem[] = []
+  const customNavItems = splitCustomMenuNavItems(customMenuItemsForUser.value)
+
   if (withDashboard) {
     items.push({ path: '/dashboard', label: t('nav.dashboard'), icon: DashboardIcon })
   }
   items.push(
     { path: '/keys', label: t('nav.apiKeys'), icon: KeyIcon },
     { path: '/usage', label: t('nav.usage'), icon: ChartIcon, hideInSimpleMode: true },
+    { path: '/leaderboard', label: t('nav.dailyLeaderboard'), icon: RacingLeaderboardIcon },
+    { path: '/community', label: t('nav.community'), icon: UsersIcon },
+    { path: '/purchase', label: t('nav.buySubscription'), icon: RechargeSubscriptionIcon, hideInSimpleMode: true, featureFlag: flagPayment },
+    ...customNavItems.recharge,
+    { path: '/redeem', label: t('nav.redeem'), icon: GiftIcon, hideInSimpleMode: true },
+    { path: '/orders', label: t('nav.myOrders'), icon: OrderListIcon, hideInSimpleMode: true, featureFlag: flagPayment },
+    { path: '/subscriptions', label: t('nav.mySubscriptions'), icon: CreditCardIcon, hideInSimpleMode: true },
+    ...customNavItems.other,
+    ...customNavItems.mediaPricing,
     { path: '/available-channels', label: t('nav.availableChannels'), icon: ChannelIcon, hideInSimpleMode: true, featureFlag: flagAvailableChannels },
     { path: '/monitor', label: t('nav.channelStatus'), icon: SignalIcon, featureFlag: flagChannelMonitor },
-    { path: '/subscriptions', label: t('nav.mySubscriptions'), icon: CreditCardIcon, hideInSimpleMode: true },
-    { path: '/purchase', label: t('nav.buySubscription'), icon: RechargeSubscriptionIcon, hideInSimpleMode: true, featureFlag: flagPayment },
-    { path: '/orders', label: t('nav.myOrders'), icon: OrderListIcon, hideInSimpleMode: true, featureFlag: flagPayment },
-    { path: '/redeem', label: t('nav.redeem'), icon: GiftIcon, hideInSimpleMode: true },
     { path: '/affiliate', label: t('nav.affiliate'), icon: UsersIcon, hideInSimpleMode: true, featureFlag: flagAffiliate },
-    { path: '/community', label: t('nav.community'), icon: UsersIcon },
     { path: '/profile', label: t('nav.profile'), icon: UserIcon },
-    ...customMenuItemsForUser.value.map((item): NavItem => ({
-      path: `/custom/${item.id}`,
-      label: item.label,
-      icon: null,
-      iconSvg: item.icon_svg,
-    })),
   )
   return items
 }

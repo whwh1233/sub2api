@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/pkg/timezone"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/usagestats"
 	middleware2 "github.com/Wei-Shaw/sub2api/internal/server/middleware"
 	"github.com/Wei-Shaw/sub2api/internal/service"
@@ -17,7 +18,8 @@ import (
 
 type dailyUsageRepoStub struct {
 	service.UsageLogRepository
-	trend []usagestats.TrendDataPoint
+	trend       []usagestats.TrendDataPoint
+	leaderboard *usagestats.DailyLeaderboardResponse
 
 	called      bool
 	startTime   time.Time
@@ -25,6 +27,10 @@ type dailyUsageRepoStub struct {
 	granularity string
 	userID      int64
 	apiKeyID    int64
+
+	leaderboardCalled        bool
+	leaderboardCurrentUserID int64
+	leaderboardLimit         int
 }
 
 func (s *dailyUsageRepoStub) GetUsageTrendWithFilters(
@@ -44,6 +50,20 @@ func (s *dailyUsageRepoStub) GetUsageTrendWithFilters(
 	s.userID = userID
 	s.apiKeyID = apiKeyID
 	return s.trend, nil
+}
+
+func (s *dailyUsageRepoStub) GetDailyLeaderboard(
+	ctx context.Context,
+	startTime, endTime time.Time,
+	currentUserID int64,
+	limit int,
+) (*usagestats.DailyLeaderboardResponse, error) {
+	s.leaderboardCalled = true
+	s.startTime = startTime
+	s.endTime = endTime
+	s.leaderboardCurrentUserID = currentUserID
+	s.leaderboardLimit = limit
+	return s.leaderboard, nil
 }
 
 type dailyUsageAPIKeyRepoStub struct {
@@ -74,12 +94,85 @@ func newDailyUsageTestRouter(usageRepo *dailyUsageRepoStub, apiKeyRepo *dailyUsa
 	return router
 }
 
+func newDailyLeaderboardTestRouter(usageRepo *dailyUsageRepoStub, userID int64) *gin.Engine {
+	gin.SetMode(gin.TestMode)
+	usageSvc := service.NewUsageService(usageRepo, nil, nil, nil)
+	handler := NewUsageHandler(usageSvc, nil)
+	router := gin.New()
+	router.Use(func(c *gin.Context) {
+		c.Set(string(middleware2.ContextKeyUser), middleware2.AuthSubject{UserID: userID})
+		c.Next()
+	})
+	router.GET("/usage/leaderboard/daily", handler.DailyLeaderboard)
+	return router
+}
+
 type dailyUsageHandlerResponse struct {
 	Code int `json:"code"`
 	Data struct {
 		Items []usagestats.APIKeyDailyUsagePoint `json:"items"`
 		Days  int                                `json:"days"`
 	} `json:"data"`
+}
+
+type dailyLeaderboardHandlerResponse struct {
+	Code int                                 `json:"code"`
+	Data usagestats.DailyLeaderboardResponse `json:"data"`
+}
+
+func TestDailyLeaderboardReturnsTopAndCurrentUser(t *testing.T) {
+	require.NoError(t, timezone.Init("Asia/Shanghai"))
+	t.Cleanup(func() { _ = timezone.Init("UTC") })
+
+	rankOne := int64(1)
+	rankFour := int64(4)
+	usageRepo := &dailyUsageRepoStub{
+		leaderboard: &usagestats.DailyLeaderboardResponse{
+			Date:     "2026-05-29",
+			Timezone: "Asia/Shanghai",
+			Top: []usagestats.DailyLeaderboardItem{
+				{
+					Rank:          &rankOne,
+					UserID:        2,
+					DisplayName:   "beta",
+					TotalTokens:   900,
+					Requests:      9,
+					IsCurrentUser: false,
+				},
+			},
+			Me: usagestats.DailyLeaderboardMe{
+				DailyLeaderboardItem: usagestats.DailyLeaderboardItem{
+					Rank:          &rankFour,
+					UserID:        42,
+					DisplayName:   "me",
+					TotalTokens:   100,
+					Requests:      2,
+					IsCurrentUser: true,
+				},
+				TokensToTopThree: 201,
+			},
+		},
+	}
+	router := newDailyLeaderboardTestRouter(usageRepo, 42)
+
+	req := httptest.NewRequest(http.MethodGet, "/usage/leaderboard/daily", nil)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusOK, rec.Code)
+	require.True(t, usageRepo.leaderboardCalled)
+	require.Equal(t, int64(42), usageRepo.leaderboardCurrentUserID)
+	require.Equal(t, 10, usageRepo.leaderboardLimit)
+	require.True(t, usageRepo.startTime.Before(usageRepo.endTime))
+
+	var got dailyLeaderboardHandlerResponse
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &got))
+	require.Equal(t, usageRepo.startTime.Format("2006-01-02"), got.Data.Date)
+	require.Equal(t, "Asia/Shanghai", got.Data.Timezone)
+	require.Len(t, got.Data.Top, 1)
+	require.Equal(t, "beta", got.Data.Top[0].DisplayName)
+	require.Equal(t, int64(42), got.Data.Me.UserID)
+	require.Equal(t, int64(201), got.Data.Me.TokensToTopThree)
 }
 
 func TestGetMyAPIKeyDailyUsageRejectsCrossUserAccess(t *testing.T) {

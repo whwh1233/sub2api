@@ -50,6 +50,26 @@ export interface UserDashboardStats {
   by_platform?: PlatformDashboardStats[]
 }
 
+export interface DailyLeaderboardItem {
+  rank: number | null
+  user_id: number
+  display_name: string
+  total_tokens: number
+  requests: number
+  is_current_user: boolean
+}
+
+export interface DailyLeaderboardMe extends DailyLeaderboardItem {
+  tokens_to_top_three: number
+}
+
+export interface DailyLeaderboardResponse {
+  date: string
+  timezone: string
+  top: DailyLeaderboardItem[]
+  me: DailyLeaderboardMe
+}
+
 export interface TrendParams {
   start_date?: string
   end_date?: string
@@ -231,6 +251,15 @@ export async function getDashboardStats(): Promise<UserDashboardStats> {
 }
 
 /**
+ * Get today's user-facing token leaderboard.
+ * @returns Top three rows plus current user's daily rank summary
+ */
+export async function getDailyLeaderboard(): Promise<DailyLeaderboardResponse> {
+  const { data } = await apiClient.get<DailyLeaderboardResponse>('/usage/leaderboard/daily')
+  return data
+}
+
+/**
  * Get user usage trend data
  * @param params - Query parameters for filtering
  * @returns Usage trend data for current user
@@ -313,6 +342,7 @@ export const usageAPI = {
   getById,
   // Dashboard
   getDashboardStats,
+  getDailyLeaderboard,
   getDashboardTrend,
   getDashboardModels,
   getMyApiKeyDailyUsage,

@@ -137,4 +137,7 @@ frontend/coverage/
 aicodex
 output/
 .superpowers/
+.local-dev/
+.local-prod-db-backups/
+.local-server-prodtest/
 

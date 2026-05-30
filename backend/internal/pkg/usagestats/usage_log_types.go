@@ -162,6 +162,30 @@ type UserSpendingRankingResponse struct {
 	TotalTokens     int64                     `json:"total_tokens"`
 }
 
+// DailyLeaderboardItem represents one privacy-safe daily token leaderboard row.
+type DailyLeaderboardItem struct {
+	Rank          *int64 `json:"rank"`
+	UserID        int64  `json:"user_id"`
+	DisplayName   string `json:"display_name"`
+	TotalTokens   int64  `json:"total_tokens"`
+	Requests      int64  `json:"requests"`
+	IsCurrentUser bool   `json:"is_current_user"`
+}
+
+// DailyLeaderboardMe represents the current user's daily leaderboard summary.
+type DailyLeaderboardMe struct {
+	DailyLeaderboardItem
+	TokensToTopThree int64 `json:"tokens_to_top_three"`
+}
+
+// DailyLeaderboardResponse represents today's public leaderboard and current-user summary.
+type DailyLeaderboardResponse struct {
+	Date     string                 `json:"date"`
+	Timezone string                 `json:"timezone"`
+	Top      []DailyLeaderboardItem `json:"top"`
+	Me       DailyLeaderboardMe     `json:"me"`
+}
+
 // UserBreakdownItem represents per-user usage breakdown within a dimension (group, model, endpoint).
 type UserBreakdownItem struct {
 	UserID      int64   `json:"user_id"`
