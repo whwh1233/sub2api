@@ -65,16 +65,25 @@ var (
 
 // UserListFilters contains all filter options for listing users
 type UserListFilters struct {
-	Status     string           // User status filter
-	Role       string           // User role filter
-	Search     string           // Search in email, username
-	GroupName  string           // Filter by allowed group name (fuzzy match)
-	Attributes map[int64]string // Custom attribute filters: attributeID -> value
+	Status              string           // User status filter
+	Role                string           // User role filter
+	Search              string           // Search in email, username
+	GroupName           string           // Filter by allowed group name (fuzzy match)
+	BalanceState        string           // Balance state filter for admin balance overview
+	LowBalanceThreshold float64          // Threshold used when BalanceState is low
+	Attributes          map[int64]string // Custom attribute filters: attributeID -> value
 	// IncludeSubscriptions controls whether ListWithFilters should load active subscriptions.
 	// For large datasets this can be expensive; admin list pages should enable it on demand.
 	// nil means not specified (default: load subscriptions for backward compatibility).
 	IncludeSubscriptions *bool
 }
+
+const (
+	UserBalanceStatePositive = "positive"
+	UserBalanceStateLow      = "low"
+	UserBalanceStateAbnormal = "abnormal"
+	UserBalanceStateZero     = "zero"
+)
 
 type UserRepository interface {
 	Create(ctx context.Context, user *User) error
@@ -93,6 +102,7 @@ type UserRepository interface {
 	GetLatestUsedAtByUserID(ctx context.Context, userID int64) (*time.Time, error)
 	UpdateUserLastActiveAt(ctx context.Context, userID int64, activeAt time.Time) error
 
+	GetBalanceSummary(ctx context.Context, lowBalanceThreshold float64) (*BalanceSummary, error)
 	UpdateBalance(ctx context.Context, id int64, amount float64) error
 	DeductBalance(ctx context.Context, id int64, amount float64) error
 	UpdateConcurrency(ctx context.Context, id int64, amount int) error

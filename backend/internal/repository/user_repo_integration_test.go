@@ -249,6 +249,63 @@ func (s *UserRepoSuite) TestListWithFilters_Status() {
 	s.Require().Equal(service.StatusActive, users[0].Status)
 }
 
+func (s *UserRepoSuite) TestGetBalanceSummary() {
+	s.mustCreateUser(&service.User{Email: "positive@test.com", Balance: 10, Status: service.StatusActive})
+	s.mustCreateUser(&service.User{Email: "low@test.com", Balance: 0.5, Status: service.StatusActive})
+	s.mustCreateUser(&service.User{Email: "zero@test.com", Balance: 0, Status: service.StatusActive})
+	s.mustCreateUser(&service.User{Email: "disabled-low@test.com", Balance: 0.25, Status: service.StatusDisabled})
+	s.mustCreateUser(&service.User{Email: "negative@test.com", Balance: -2, Status: service.StatusActive})
+
+	summary, err := s.repo.GetBalanceSummary(s.ctx, 1)
+
+	s.Require().NoError(err)
+	s.Require().NotNil(summary)
+	s.InDelta(8.75, summary.TotalBalance, 0.000001)
+	s.Equal(int64(3), summary.PositiveBalanceUsers)
+	s.Equal(int64(1), summary.LowBalanceUsers)
+	s.Equal(int64(1), summary.AbnormalBalanceUsers)
+}
+
+func (s *UserRepoSuite) TestListWithFilters_BalanceState() {
+	s.mustCreateUser(&service.User{Email: "positive@test.com", Balance: 10, Status: service.StatusActive})
+	low := s.mustCreateUser(&service.User{Email: "low@test.com", Balance: 0.5, Status: service.StatusActive})
+	zero := s.mustCreateUser(&service.User{Email: "zero@test.com", Balance: 0, Status: service.StatusActive})
+	s.mustCreateUser(&service.User{Email: "disabled-low@test.com", Balance: 0.25, Status: service.StatusDisabled})
+	negative := s.mustCreateUser(&service.User{Email: "negative@test.com", Balance: -2, Status: service.StatusActive})
+
+	users, page, err := s.repo.ListWithFilters(s.ctx, pagination.PaginationParams{Page: 1, PageSize: 10}, service.UserListFilters{
+		BalanceState:        service.UserBalanceStateLow,
+		LowBalanceThreshold: 1,
+	})
+	s.Require().NoError(err)
+	s.Require().Equal(int64(1), page.Total)
+	s.Require().Len(users, 1)
+	s.Require().Equal(low.ID, users[0].ID)
+
+	users, page, err = s.repo.ListWithFilters(s.ctx, pagination.PaginationParams{Page: 1, PageSize: 10}, service.UserListFilters{
+		BalanceState: service.UserBalanceStateAbnormal,
+	})
+	s.Require().NoError(err)
+	s.Require().Equal(int64(1), page.Total)
+	s.Require().Len(users, 1)
+	s.Require().Equal(negative.ID, users[0].ID)
+
+	users, page, err = s.repo.ListWithFilters(s.ctx, pagination.PaginationParams{Page: 1, PageSize: 10}, service.UserListFilters{
+		BalanceState: service.UserBalanceStateZero,
+	})
+	s.Require().NoError(err)
+	s.Require().Equal(int64(1), page.Total)
+	s.Require().Len(users, 1)
+	s.Require().Equal(zero.ID, users[0].ID)
+
+	users, page, err = s.repo.ListWithFilters(s.ctx, pagination.PaginationParams{Page: 1, PageSize: 10}, service.UserListFilters{
+		BalanceState: service.UserBalanceStatePositive,
+	})
+	s.Require().NoError(err)
+	s.Require().Equal(int64(3), page.Total)
+	s.Require().Len(users, 3)
+}
+
 func (s *UserRepoSuite) TestListWithFilters_Role() {
 	s.mustCreateUser(&service.User{Email: "user@test.com", Role: service.RoleUser})
 	s.mustCreateUser(&service.User{Email: "admin@test.com", Role: service.RoleAdmin})

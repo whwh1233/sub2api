@@ -152,6 +152,14 @@ describe('AppSidebar daily leaderboard navigation', () => {
   })
 })
 
+describe('AppSidebar admin balance overview navigation', () => {
+  it('links admins to the dedicated balance overview page', () => {
+    expect(componentSource).toContain("path: '/admin/balances'")
+    expect(componentSource).toContain("label: t('nav.balanceOverview')")
+    expect(componentSource).toContain('CreditCardIcon')
+  })
+})
+
 describe('AppSidebar user navigation order', () => {
   it('places recharge with redeem and keeps pricing/status/profile items at the end', () => {
     const wrapper = mount(AppSidebar, {

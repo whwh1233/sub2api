@@ -174,6 +174,17 @@ func (s *stubAdminService) DeleteUser(ctx context.Context, id int64) error {
 	return nil
 }
 
+func (s *stubAdminService) GetBalanceSummary(ctx context.Context) (*service.BalanceSummary, error) {
+	return &service.BalanceSummary{
+		TotalBalance:         10,
+		PositiveBalanceUsers: 1,
+		LowBalanceUsers:      0,
+		AbnormalBalanceUsers: 0,
+		LowBalanceThreshold:  1,
+		GeneratedAt:          time.Now().UTC(),
+	}, nil
+}
+
 func (s *stubAdminService) UpdateUserBalance(ctx context.Context, userID int64, balance float64, operation string, notes string) (*service.User, error) {
 	user := service.User{ID: userID, Balance: balance, Status: service.StatusActive}
 	return &user, nil

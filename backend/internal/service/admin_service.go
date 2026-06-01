@@ -36,6 +36,7 @@ type AdminService interface {
 	CreateUser(ctx context.Context, input *CreateUserInput) (*User, error)
 	UpdateUser(ctx context.Context, id int64, input *UpdateUserInput) (*User, error)
 	DeleteUser(ctx context.Context, id int64) error
+	GetBalanceSummary(ctx context.Context) (*BalanceSummary, error)
 	UpdateUserBalance(ctx context.Context, userID int64, balance float64, operation string, notes string) (*User, error)
 	BatchUpdateConcurrency(ctx context.Context, userIDs []int64, value int, mode string) (int, error)
 	GetUserAPIKeys(ctx context.Context, userID int64, page, pageSize int, sortBy, sortOrder string) ([]APIKey, int64, error)
@@ -147,6 +148,16 @@ type UpdateUserInput struct {
 	// GroupRates 用户专属分组倍率配置
 	// map[groupID]*rate，nil 表示删除该分组的专属倍率
 	GroupRates map[int64]*float64
+}
+
+// BalanceSummary contains admin-only aggregate balance metrics.
+type BalanceSummary struct {
+	TotalBalance         float64   `json:"total_balance"`
+	PositiveBalanceUsers int64     `json:"positive_balance_users"`
+	LowBalanceUsers      int64     `json:"low_balance_users"`
+	AbnormalBalanceUsers int64     `json:"abnormal_balance_users"`
+	LowBalanceThreshold  float64   `json:"low_balance_threshold"`
+	GeneratedAt          time.Time `json:"generated_at"`
 }
 
 type AdminBindAuthIdentityInput struct {
@@ -522,6 +533,8 @@ const (
 
 var ErrRPMStatusUnavailable = infraerrors.New(http.StatusNotImplemented, "RPM_STATUS_UNAVAILABLE", "RPM cache not available")
 
+const defaultBalanceOverviewLowBalanceThreshold = 1.0
+
 // adminServiceImpl implements AdminService
 type adminServiceImpl struct {
 	userRepo             UserRepository
@@ -593,6 +606,9 @@ func NewAdminService(
 
 // User management implementations
 func (s *adminServiceImpl) ListUsers(ctx context.Context, page, pageSize int, filters UserListFilters, sortBy, sortOrder string) ([]User, int64, error) {
+	if filters.BalanceState == UserBalanceStateLow {
+		filters.LowBalanceThreshold = s.balanceOverviewLowBalanceThreshold(ctx)
+	}
 	params := pagination.PaginationParams{Page: page, PageSize: pageSize, SortBy: sortBy, SortOrder: sortOrder}
 	users, result, err := s.userRepo.ListWithFilters(ctx, params, filters)
 	if err != nil {
@@ -649,6 +665,36 @@ func (s *adminServiceImpl) loadUserGroupRatesOneByOne(ctx context.Context, users
 		}
 		users[i].GroupRates = rates
 	}
+}
+
+func (s *adminServiceImpl) GetBalanceSummary(ctx context.Context) (*BalanceSummary, error) {
+	threshold := s.balanceOverviewLowBalanceThreshold(ctx)
+	summary, err := s.userRepo.GetBalanceSummary(ctx, threshold)
+	if err != nil {
+		return nil, err
+	}
+	if summary == nil {
+		summary = &BalanceSummary{}
+	}
+	summary.LowBalanceThreshold = threshold
+	summary.GeneratedAt = time.Now().UTC()
+	return summary, nil
+}
+
+func (s *adminServiceImpl) balanceOverviewLowBalanceThreshold(ctx context.Context) float64 {
+	threshold := defaultBalanceOverviewLowBalanceThreshold
+	if s.settingService == nil || s.settingService.settingRepo == nil {
+		return threshold
+	}
+	raw, err := s.settingService.settingRepo.GetValue(ctx, SettingKeyBalanceLowNotifyThreshold)
+	if err != nil {
+		return threshold
+	}
+	value, err := strconv.ParseFloat(strings.TrimSpace(raw), 64)
+	if err != nil || value < 0 {
+		return threshold
+	}
+	return value
 }
 
 func (s *adminServiceImpl) GetUser(ctx context.Context, id int64) (*User, error) {

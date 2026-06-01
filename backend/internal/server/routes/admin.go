@@ -226,6 +226,11 @@ func registerDashboardRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 }
 
 func registerUserManagementRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
+	balances := admin.Group("/balances")
+	{
+		balances.GET("/summary", h.Admin.User.GetBalanceSummary)
+	}
+
 	users := admin.Group("/users")
 	{
 		users.GET("", h.Admin.User.List)

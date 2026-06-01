@@ -182,6 +182,9 @@ func (m *mockUserRepo) List(context.Context, pagination.PaginationParams) ([]Use
 func (m *mockUserRepo) ListWithFilters(context.Context, pagination.PaginationParams, UserListFilters) ([]User, *pagination.PaginationResult, error) {
 	return nil, nil, nil
 }
+func (m *mockUserRepo) GetBalanceSummary(context.Context, float64) (*BalanceSummary, error) {
+	return &BalanceSummary{}, nil
+}
 func (m *mockUserRepo) UpdateBalance(ctx context.Context, id int64, amount float64) error {
 	if m.updateBalanceFn != nil {
 		return m.updateBalanceFn(ctx, id, amount)

@@ -11,8 +11,8 @@ export default {
     getStarted: '立即开始',
     goToDashboard: '进入控制台',
     // 新增：面向用户的价值主张
-    heroSubtitle: '一个密钥，畅用多个 AI 模型',
-    heroDescription: '无需管理多个订阅账号，一站式接入 Claude、GPT、Gemini 等主流 AI 服务',
+    heroSubtitle: 'ChatGPT 与 Claude 高阶模型池',
+    heroDescription: '一个 API 密钥，按需调用 ChatGPT GPT 5.5 / 5.4 与 Claude Opus 4.8 / 4.7，适合代码、写作、推理和团队自动化场景。',
     tags: {
       subscriptionToApi: '订阅转 API',
       stickySession: '会话保持',
@@ -47,11 +47,16 @@ export default {
     },
     features: {
       unifiedGateway: '一键接入',
-      unifiedGatewayDesc: '获取一个 API 密钥，即可调用所有已接入的 AI 模型，无需分别申请。',
+      unifiedGatewayDesc: '获取一个 API 密钥，即可调用已接入的 ChatGPT 与 Claude 模型池，无需分别申请。',
       multiAccount: '稳定可靠',
-      multiAccountDesc: '智能调度多个上游账号，自动切换和负载均衡，告别频繁报错。',
+      multiAccountDesc: '智能调度多个上游账号，自动切换和负载均衡，减少请求失败。',
       balanceQuota: '用多少付多少',
       balanceQuotaDesc: '按实际使用量计费，支持设置配额上限，团队用量一目了然。'
+    },
+    modelLineup: {
+      title: '模型池',
+      description: 'ChatGPT · Claude · GPT 5.5 · Opus 4.8',
+      soon: 'ChatGPT / Claude 模型池 · 正常运行'
     },
     // 优势对比
     comparison: {
@@ -90,13 +95,16 @@ export default {
       }
     },
     providers: {
-      title: '已支持的 AI 模型',
+      title: '模型池',
       description: '一个 API，多种选择',
       supported: '已支持',
-      soon: '即将推出',
+      soon: '更多高阶模型持续接入',
+      chatgpt: 'ChatGPT',
       claude: 'Claude',
-      gemini: 'Gemini',
-      antigravity: 'Antigravity',
+      gpt55: 'GPT 5.5',
+      gpt54: 'GPT 5.4',
+      opus48: 'Opus 4.8',
+      opus47: 'Opus 4.7',
       more: '更多'
     },
     // CTA 区块
@@ -359,6 +367,7 @@ export default {
     affiliateTransferRecords: '提取记录',
     profile: '个人资料',
     users: '用户管理',
+    balanceOverview: '余额总览',
     groups: '分组管理',
     channels: '渠道管理',
     availableChannels: '可用渠道',
@@ -1843,6 +1852,45 @@ export default {
         rebatedInviteeCount: '已产生返利人数',
         availableQuota: '可提余额',
         historyQuota: '历史返利'
+      }
+    },
+
+    balances: {
+      title: '余额总览',
+      description: '查看全站用户余额汇总，并快速进入余额调整和明细',
+      searchPlaceholder: '搜索邮箱、用户名或备注...',
+        summary: {
+          totalBalance: '总余额',
+          positiveUsers: '有余额用户',
+          lowBalanceUsers: '低余额用户',
+          abnormalUsers: '异常余额用户'
+        },
+        filters: {
+          allBalanceStates: '全部余额',
+          positive: '有余额',
+          low: '低余额',
+          abnormal: '异常余额',
+          zero: '零余额'
+        },
+        columns: {
+        user: '用户',
+        balance: '余额',
+        status: '状态',
+        lastActive: '最后活跃',
+        lastUsed: '最后使用',
+        created: '创建时间',
+        actions: '操作'
+      },
+      actions: {
+        deposit: '充值',
+        history: '明细'
+      },
+      empty: {
+        title: '暂无余额数据'
+      },
+      errors: {
+        summaryFailed: '加载余额汇总失败',
+        usersFailed: '加载用户余额列表失败'
       }
     },
 

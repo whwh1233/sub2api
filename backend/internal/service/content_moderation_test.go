@@ -221,6 +221,10 @@ func (r *contentModerationTestUserRepo) UpdateUserLastActiveAt(ctx context.Conte
 	panic("unexpected UpdateUserLastActiveAt call")
 }
 
+func (r *contentModerationTestUserRepo) GetBalanceSummary(ctx context.Context, lowBalanceThreshold float64) (*BalanceSummary, error) {
+	panic("unexpected GetBalanceSummary call")
+}
+
 func (r *contentModerationTestUserRepo) UpdateBalance(ctx context.Context, id int64, amount float64) error {
 	panic("unexpected UpdateBalance call")
 }

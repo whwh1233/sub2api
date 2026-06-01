@@ -186,6 +186,10 @@ func (s *stubUserRepo) UpdateUserLastActiveAt(ctx context.Context, userID int64,
 	panic("unexpected UpdateUserLastActiveAt call")
 }
 
+func (s *stubUserRepo) GetBalanceSummary(ctx context.Context, lowBalanceThreshold float64) (*service.BalanceSummary, error) {
+	panic("unexpected GetBalanceSummary call")
+}
+
 func (s *stubUserRepo) UpdateBalance(ctx context.Context, id int64, amount float64) error {
 	panic("unexpected UpdateBalance call")
 }

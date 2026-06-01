@@ -31,7 +31,7 @@
 页面使用现有管理员布局和表格风格，包含：
 
 - 汇总卡片：总余额、正余额用户数、低余额用户数、异常余额用户数。
-- 搜索和状态筛选。
+- 搜索、状态筛选和余额状态筛选。
 - 分页表格：用户 ID、邮箱、用户名、角色、状态、余额、最近活跃时间、最近使用时间和操作。
 - 行操作：充值、扣款、余额历史，复用现有用户管理页里的余额弹窗或对应逻辑。
 - 加载、错误、空状态，保持和其它管理员页面一致。
@@ -89,7 +89,14 @@ GET /api/v1/admin/balances/summary
 GET /api/v1/admin/users
 ```
 
-如果余额页需要的排序或筛选当前接口不支持，只补齐该页面所需的最小能力。
+余额页在该接口上补充最小筛选能力：
+
+- `balance_state=positive`：`balance > 0`。
+- `balance_state=low`：状态为 active，且 `balance > 0`、`balance <= low_balance_threshold`。
+- `balance_state=abnormal`：`balance < 0`。
+- `balance_state=zero`：`balance = 0`。
+
+低余额筛选和汇总卡片使用同一阈值来源。
 
 ## 后端实现
 

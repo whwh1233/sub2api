@@ -1429,6 +1429,10 @@ func (r *stubUserRepo) ListWithFilters(ctx context.Context, params pagination.Pa
 	return nil, nil, errors.New("not implemented")
 }
 
+func (r *stubUserRepo) GetBalanceSummary(ctx context.Context, lowBalanceThreshold float64) (*service.BalanceSummary, error) {
+	return &service.BalanceSummary{}, nil
+}
+
 func (r *stubUserRepo) UpdateBalance(ctx context.Context, id int64, amount float64) error {
 	return errors.New("not implemented")
 }

@@ -106,6 +106,7 @@ type BindUserAuthIdentityChannelRequest struct {
 //   - search: search in email, username
 //   - attr[{id}]: filter by custom attribute value, e.g. attr[1]=company
 //   - group_name: fuzzy filter by allowed group name
+//   - balance_state: positive, low, abnormal, zero
 func (h *UserHandler) List(c *gin.Context) {
 	page, pageSize := response.ParsePagination(c)
 
@@ -117,11 +118,12 @@ func (h *UserHandler) List(c *gin.Context) {
 	}
 
 	filters := service.UserListFilters{
-		Status:     c.Query("status"),
-		Role:       c.Query("role"),
-		Search:     search,
-		GroupName:  strings.TrimSpace(c.Query("group_name")),
-		Attributes: parseAttributeFilters(c),
+		Status:       c.Query("status"),
+		Role:         c.Query("role"),
+		Search:       search,
+		GroupName:    strings.TrimSpace(c.Query("group_name")),
+		BalanceState: strings.TrimSpace(c.Query("balance_state")),
+		Attributes:   parseAttributeFilters(c),
 	}
 	sortBy := c.DefaultQuery("sort_by", "created_at")
 	sortOrder := c.DefaultQuery("sort_order", "desc")
@@ -322,6 +324,17 @@ func (h *UserHandler) Delete(c *gin.Context) {
 	}
 
 	response.Success(c, gin.H{"message": "User deleted successfully"})
+}
+
+// GetBalanceSummary handles getting aggregate user balance metrics.
+// GET /api/v1/admin/balances/summary
+func (h *UserHandler) GetBalanceSummary(c *gin.Context) {
+	summary, err := h.adminService.GetBalanceSummary(c.Request.Context())
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, summary)
 }
 
 // UpdateBalance handles updating user balance

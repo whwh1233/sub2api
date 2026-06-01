@@ -17,11 +17,8 @@
     v-else
     class="relative flex min-h-screen flex-col overflow-hidden bg-[#faf7f0] dark:bg-dark-950"
   >
-    <!-- Background Decorations: 1 warm glow + grid -->
+    <!-- Background Decorations: editorial grid -->
     <div class="pointer-events-none absolute inset-0 overflow-hidden">
-      <div
-        class="absolute -left-40 -top-40 h-96 w-96 rounded-full bg-primary-400/25 blur-3xl"
-      ></div>
       <div
         class="absolute inset-0 bg-[linear-gradient(rgba(255,107,53,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(255,107,53,0.03)_1px,transparent_1px)] bg-[size:64px_64px]"
       ></div>
@@ -35,7 +32,7 @@
           <div class="h-9 w-9 overflow-hidden rounded-[10px]">
             <img :src="siteLogo || '/logo.png'" alt="Logo" class="h-full w-full object-cover" />
           </div>
-          <span class="text-sm font-bold tracking-tight text-gray-900 dark:text-white">
+          <span class="text-sm font-bold text-gray-900 dark:text-white">
             {{ siteName }} <span class="text-gray-400 dark:text-dark-500">· 2026</span>
           </span>
         </div>
@@ -110,15 +107,34 @@
         <!-- ====== HERO · Magazine Typography ====== -->
         <section class="py-6 md:py-10">
           <div class="inline-block border-b border-gray-900 pb-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-gray-600 dark:border-white dark:text-dark-300">
-            ISSUE · 01 · ONE KEY · EVERY MODEL
+            ISSUE · 01 · CHATGPT + CLAUDE MODEL POOL
           </div>
-          <h1 class="mt-5 text-5xl font-black leading-[0.9] tracking-tight text-gray-900 dark:text-white md:text-7xl lg:text-[84px]">
+          <h1 class="mt-5 text-5xl font-black leading-[0.9] text-gray-900 dark:text-white md:text-7xl lg:text-[84px]">
             {{ siteName }}<span class="bg-gradient-to-r from-[#ff6b35] to-[#ff9166] bg-clip-text text-transparent">.</span>
           </h1>
           <div class="mt-6 grid grid-cols-1 items-end gap-6 md:grid-cols-[2fr_1fr] md:gap-10">
-            <p class="max-w-xl text-sm leading-relaxed text-gray-600 dark:text-dark-300 md:text-base">
-              {{ siteSubtitle }}
-            </p>
+            <div class="max-w-2xl">
+              <p class="text-lg font-bold leading-snug text-gray-900 dark:text-white md:text-2xl">
+                {{ t('home.heroSubtitle') }}
+              </p>
+              <p class="mt-3 text-sm leading-relaxed text-gray-600 dark:text-dark-300 md:text-base">
+                {{ t('home.heroDescription') }}
+              </p>
+              <div class="mt-4 flex flex-wrap gap-2">
+                <span class="rounded-lg border border-gray-900 bg-white/70 px-3 py-1 text-xs font-bold text-gray-900 dark:border-white dark:bg-dark-900/70 dark:text-white">
+                  {{ t('home.providers.chatgpt') }}
+                </span>
+                <span class="rounded-lg border border-[#ebe6dc] bg-white/70 px-3 py-1 text-xs font-bold text-gray-700 dark:border-dark-700 dark:bg-dark-900/70 dark:text-dark-200">
+                  {{ t('home.providers.claude') }}
+                </span>
+                <span class="rounded-lg border border-[#ebe6dc] bg-white/70 px-3 py-1 text-xs font-bold text-gray-700 dark:border-dark-700 dark:bg-dark-900/70 dark:text-dark-200">
+                  {{ t('home.providers.gpt55') }} / {{ t('home.providers.gpt54') }}
+                </span>
+                <span class="rounded-lg border border-[#ebe6dc] bg-white/70 px-3 py-1 text-xs font-bold text-gray-700 dark:border-dark-700 dark:bg-dark-900/70 dark:text-dark-200">
+                  {{ t('home.providers.opus48') }} / {{ t('home.providers.opus47') }}
+                </span>
+              </div>
+            </div>
             <div class="flex flex-wrap gap-2 md:justify-end">
               <router-link
                 :to="isAuthenticated ? dashboardPath : '/login'"
@@ -146,31 +162,32 @@
         <!-- ====== BENTO data strip ====== -->
         <section class="grid grid-cols-2 gap-3 md:grid-cols-4">
           <!-- Tile 1: MODELS -->
-          <div class="rounded-xl border border-[#ebe6dc] bg-white/70 p-4 backdrop-blur-sm dark:border-dark-700 dark:bg-dark-800/60">
-            <div class="text-[10px] font-semibold uppercase tracking-widest text-gray-500 dark:text-dark-400">MODELS</div>
+          <div class="rounded-lg border border-[#ebe6dc] bg-white/70 p-4 backdrop-blur-sm dark:border-dark-700 dark:bg-dark-800/60">
+            <div class="text-[10px] font-semibold uppercase tracking-widest text-gray-500 dark:text-dark-400">{{ t('home.modelLineup.title') }}</div>
             <div class="mt-1 text-3xl font-black text-gray-900 dark:text-white md:text-4xl">4+</div>
-            <div class="mt-1 text-[10px] text-gray-500 dark:text-dark-400">Claude · GPT · Gemini · ...</div>
+            <div class="mt-1 text-[10px] text-gray-500 dark:text-dark-400">{{ t('home.modelLineup.description') }}</div>
           </div>
           <!-- Tile 2: STATUS (filled orange) -->
-          <div class="rounded-xl bg-[#ff6b35] p-4 text-[#0f0f10]">
+          <div class="rounded-lg bg-[#ff6b35] p-4 text-[#0f0f10]">
             <div class="text-[10px] font-semibold uppercase tracking-widest opacity-80">STATUS</div>
             <div class="mt-1 text-xl font-black md:text-2xl">●●● Online</div>
-            <div class="mt-1 text-[10px] opacity-75">API 网关 · 正常运行</div>
+            <div class="mt-1 text-[10px] opacity-75">{{ t('home.modelLineup.soon') }}</div>
           </div>
           <!-- Tile 3: CAPACITY -->
-          <div class="rounded-xl border border-[#ebe6dc] bg-white/70 p-4 backdrop-blur-sm dark:border-dark-700 dark:bg-dark-800/60">
+          <div class="rounded-lg border border-[#ebe6dc] bg-white/70 p-4 backdrop-blur-sm dark:border-dark-700 dark:bg-dark-800/60">
             <div class="text-[10px] font-semibold uppercase tracking-widest text-gray-500 dark:text-dark-400">MAX CAPACITY</div>
             <div class="mt-1 text-3xl font-black text-gray-900 dark:text-white md:text-4xl">
               20<span class="text-gray-400 dark:text-dark-500">×</span>
             </div>
-            <div class="mt-1 text-[10px] text-gray-500 dark:text-dark-400">Max 配额加成</div>
+            <div class="mt-1 text-[10px] text-gray-500 dark:text-dark-400">Max / Pro 配额池</div>
           </div>
           <!-- Tile 4: code snippet -->
-          <div class="rounded-xl bg-[#0f0f10] p-4 font-mono text-[11px] leading-relaxed text-gray-300">
+          <div class="rounded-lg bg-[#0f0f10] p-4 font-mono text-[11px] leading-relaxed text-gray-300">
             <div class="text-[9px] uppercase tracking-widest text-gray-500">// 快速开始</div>
-            <div class="mt-1 text-purple-300">curl</div>
-            <div class="truncate text-blue-300">api.pubwhere.cn</div>
-            <div class="font-bold text-green-400">→ 200 OK</div>
+            <div class="mt-1 text-purple-300">base_url</div>
+            <div class="truncate text-blue-300">https://closeai.space</div>
+            <div class="font-bold text-green-400">model: chatgpt/gpt-5.5</div>
+            <div class="text-gray-300">/chat/completions <span class="font-bold text-green-400">→ routed</span></div>
           </div>
         </section>
 
@@ -214,15 +231,19 @@
         <!-- ====== Provider text strip ====== -->
         <section class="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm md:gap-x-6">
           <div class="text-[10px] font-bold uppercase tracking-[0.2em] text-gray-600 dark:text-dark-300">
-            POWERED BY —
+            {{ t('home.providers.title') }} —
           </div>
+          <span class="font-bold text-gray-900 dark:text-white">{{ t('home.providers.chatgpt') }}</span>
+          <span class="text-gray-300 dark:text-dark-600">·</span>
           <span class="font-bold text-gray-900 dark:text-white">{{ t('home.providers.claude') }}</span>
           <span class="text-gray-300 dark:text-dark-600">·</span>
-          <span class="font-bold text-gray-900 dark:text-white">GPT</span>
+          <span class="font-bold text-gray-900 dark:text-white">{{ t('home.providers.gpt55') }}</span>
           <span class="text-gray-300 dark:text-dark-600">·</span>
-          <span class="font-bold text-gray-900 dark:text-white">{{ t('home.providers.gemini') }}</span>
+          <span class="font-bold text-gray-900 dark:text-white">{{ t('home.providers.gpt54') }}</span>
           <span class="text-gray-300 dark:text-dark-600">·</span>
-          <span class="font-bold text-gray-900 dark:text-white">{{ t('home.providers.antigravity') }}</span>
+          <span class="font-bold text-gray-900 dark:text-white">{{ t('home.providers.opus48') }}</span>
+          <span class="text-gray-300 dark:text-dark-600">·</span>
+          <span class="font-bold text-gray-900 dark:text-white">{{ t('home.providers.opus47') }}</span>
           <span class="ml-auto text-xs text-gray-500 dark:text-dark-400">+ {{ t('home.providers.soon') }}</span>
         </section>
       </div>
@@ -266,7 +287,6 @@ const appStore = useAppStore()
 // Site settings - directly from appStore (already initialized from injected config)
 const siteName = computed(() => appStore.cachedPublicSettings?.site_name || appStore.siteName || 'Sub2API')
 const siteLogo = computed(() => appStore.cachedPublicSettings?.site_logo || appStore.siteLogo || '')
-const siteSubtitle = computed(() => appStore.cachedPublicSettings?.site_subtitle || 'One Key · Every Model')
 const docUrl = computed(() => appStore.cachedPublicSettings?.doc_url || appStore.docUrl || '')
 const homeContent = computed(() => appStore.cachedPublicSettings?.home_content || '')
 

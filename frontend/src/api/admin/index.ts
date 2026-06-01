@@ -4,6 +4,7 @@
  */
 
 import dashboardAPI from './dashboard'
+import balancesAPI from './balances'
 import usersAPI from './users'
 import groupsAPI from './groups'
 import accountsAPI from './accounts'
@@ -37,6 +38,7 @@ import riskControlAPI from './riskControl'
  */
 export const adminAPI = {
   dashboard: dashboardAPI,
+  balances: balancesAPI,
   users: usersAPI,
   groups: groupsAPI,
   accounts: accountsAPI,
@@ -68,6 +70,7 @@ export const adminAPI = {
 
 export {
   dashboardAPI,
+  balancesAPI,
   usersAPI,
   groupsAPI,
   accountsAPI,
@@ -101,6 +104,7 @@ export default adminAPI
 
 // Re-export types used by components
 export type { BalanceHistoryItem } from './users'
+export type { AdminBalanceSummary } from './balances'
 export type { ErrorPassthroughRule, CreateRuleRequest, UpdateRuleRequest } from './errorPassthrough'
 export type { BackupAgentHealth, DataManagementConfig } from './dataManagement'
 export type { TLSFingerprintProfile, CreateProfileRequest, UpdateProfileRequest } from './tlsFingerprintProfile'

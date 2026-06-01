@@ -413,6 +413,20 @@ func (r *userRepository) ListWithFilters(ctx context.Context, params pagination.
 	if filters.Role != "" {
 		q = q.Where(dbuser.RoleEQ(filters.Role))
 	}
+	switch filters.BalanceState {
+	case service.UserBalanceStatePositive:
+		q = q.Where(dbuser.BalanceGT(0))
+	case service.UserBalanceStateLow:
+		q = q.Where(
+			dbuser.StatusEQ(service.StatusActive),
+			dbuser.BalanceGT(0),
+			dbuser.BalanceLTE(filters.LowBalanceThreshold),
+		)
+	case service.UserBalanceStateAbnormal:
+		q = q.Where(dbuser.BalanceLT(0))
+	case service.UserBalanceStateZero:
+		q = q.Where(dbuser.BalanceEQ(0))
+	}
 	if filters.Search != "" {
 		q = q.Where(
 			dbuser.Or(
@@ -620,6 +634,45 @@ func (r *userRepository) GetLatestUsedAtByUserID(ctx context.Context, userID int
 		return nil, err
 	}
 	return latestByUserID[userID], nil
+}
+
+func (r *userRepository) GetBalanceSummary(ctx context.Context, lowBalanceThreshold float64) (*service.BalanceSummary, error) {
+	if r.sql == nil {
+		return nil, fmt.Errorf("sql executor is not configured")
+	}
+	if lowBalanceThreshold < 0 {
+		lowBalanceThreshold = 0
+	}
+
+	const query = `
+		SELECT
+			COALESCE(SUM(balance), 0)::float8 AS total_balance,
+			COUNT(*) FILTER (WHERE balance > 0) AS positive_balance_users,
+			COUNT(*) FILTER (
+				WHERE status = $2
+					AND balance > 0
+					AND balance <= $1
+			) AS low_balance_users,
+			COUNT(*) FILTER (WHERE balance < 0) AS abnormal_balance_users
+		FROM users
+		WHERE deleted_at IS NULL
+	`
+
+	summary := &service.BalanceSummary{}
+	if err := scanSingleRow(
+		ctx,
+		r.sql,
+		query,
+		[]any{lowBalanceThreshold, service.StatusActive},
+		&summary.TotalBalance,
+		&summary.PositiveBalanceUsers,
+		&summary.LowBalanceUsers,
+		&summary.AbnormalBalanceUsers,
+	); err != nil {
+		return nil, err
+	}
+	summary.LowBalanceThreshold = lowBalanceThreshold
+	return summary, nil
 }
 
 func userLastUsedAtOrder(sortOrder string) []func(*entsql.Selector) {

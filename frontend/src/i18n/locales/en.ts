@@ -11,8 +11,8 @@ export default {
     getStarted: 'Get Started',
     goToDashboard: 'Go to Dashboard',
     // User-focused value proposition
-    heroSubtitle: 'One Key, All AI Models',
-    heroDescription: 'No need to manage multiple subscriptions. Access Claude, GPT, Gemini and more with a single API key',
+    heroSubtitle: 'ChatGPT and Claude advanced model pools',
+    heroDescription: 'Use one API key to call ChatGPT GPT 5.5 / 5.4 and Claude Opus 4.8 / 4.7 for coding, writing, reasoning, and team automation.',
     tags: {
       subscriptionToApi: 'Subscription to API',
       stickySession: 'Session Persistence',
@@ -47,11 +47,16 @@ export default {
     },
     features: {
       unifiedGateway: 'One-Click Access',
-      unifiedGatewayDesc: 'Get a single API key to call all connected AI models. No separate applications needed.',
+      unifiedGatewayDesc: 'Get a single API key to call connected ChatGPT and Claude model pools. No separate applications needed.',
       multiAccount: 'Always Reliable',
-      multiAccountDesc: 'Smart routing across multiple upstream accounts with automatic failover. Say goodbye to errors.',
+      multiAccountDesc: 'Smart routing across multiple upstream accounts with automatic failover to reduce failed requests.',
       balanceQuota: 'Pay What You Use',
       balanceQuotaDesc: 'Usage-based billing with quota limits. Full visibility into team consumption.'
+    },
+    modelLineup: {
+      title: 'Model Pool',
+      description: 'ChatGPT · Claude · GPT 5.5 · Opus 4.8',
+      soon: 'ChatGPT / Claude model pools · online'
     },
     // Comparison section
     comparison: {
@@ -90,13 +95,16 @@ export default {
       }
     },
     providers: {
-      title: 'Supported AI Models',
+      title: 'MODEL POOL',
       description: 'One API, Multiple Choices',
       supported: 'Supported',
-      soon: 'Soon',
+      soon: 'More advanced models coming',
+      chatgpt: 'ChatGPT',
       claude: 'Claude',
-      gemini: 'Gemini',
-      antigravity: 'Antigravity',
+      gpt55: 'GPT 5.5',
+      gpt54: 'GPT 5.4',
+      opus48: 'Opus 4.8',
+      opus47: 'Opus 4.7',
       more: 'More'
     },
     // CTA section
@@ -359,6 +367,7 @@ export default {
     affiliateTransferRecords: 'Transfer Records',
     profile: 'Profile',
     users: 'Users',
+    balanceOverview: 'Balance Overview',
     groups: 'Groups',
     channels: 'Channels',
     availableChannels: 'Available Channels',
@@ -1822,6 +1831,45 @@ export default {
         rebatedInviteeCount: 'Rebated Invitees',
         availableQuota: 'Available Quota',
         historyQuota: 'Historical Rebate'
+      }
+    },
+
+    balances: {
+      title: 'Balance Overview',
+      description: 'Review aggregate user balances and quickly open balance adjustments or history',
+      searchPlaceholder: 'Search email, username, or notes...',
+        summary: {
+          totalBalance: 'Total Balance',
+          positiveUsers: 'Users With Balance',
+          lowBalanceUsers: 'Low Balance Users',
+          abnormalUsers: 'Abnormal Balances'
+        },
+        filters: {
+          allBalanceStates: 'All Balances',
+          positive: 'Positive Balance',
+          low: 'Low Balance',
+          abnormal: 'Abnormal Balance',
+          zero: 'Zero Balance'
+        },
+        columns: {
+        user: 'User',
+        balance: 'Balance',
+        status: 'Status',
+        lastActive: 'Last Active',
+        lastUsed: 'Last Used',
+        created: 'Created At',
+        actions: 'Actions'
+      },
+      actions: {
+        deposit: 'Top Up',
+        history: 'History'
+      },
+      empty: {
+        title: 'No balance data'
+      },
+      errors: {
+        summaryFailed: 'Failed to load balance summary',
+        usersFailed: 'Failed to load user balance list'
       }
     },
 

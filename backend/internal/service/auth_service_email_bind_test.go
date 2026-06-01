@@ -809,6 +809,10 @@ func (s *emailBindUserRepoStub) UpdateUserLastActiveAt(context.Context, int64, t
 	return nil
 }
 
+func (s *emailBindUserRepoStub) GetBalanceSummary(context.Context, float64) (*service.BalanceSummary, error) {
+	return &service.BalanceSummary{}, nil
+}
+
 func (s *emailBindUserRepoStub) UpdateBalance(context.Context, int64, float64) error { return nil }
 func (s *emailBindUserRepoStub) DeductBalance(context.Context, int64, float64) error { return nil }
 func (s *emailBindUserRepoStub) UpdateConcurrency(context.Context, int64, int) error { return nil }

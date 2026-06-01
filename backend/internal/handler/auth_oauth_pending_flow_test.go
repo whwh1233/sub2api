@@ -2813,6 +2813,10 @@ func (r *oauthPendingFlowUserRepo) ListWithFilters(context.Context, pagination.P
 	panic("unexpected ListWithFilters call")
 }
 
+func (r *oauthPendingFlowUserRepo) GetBalanceSummary(context.Context, float64) (*service.BalanceSummary, error) {
+	panic("unexpected GetBalanceSummary call")
+}
+
 func (r *oauthPendingFlowUserRepo) UpdateBalance(context.Context, int64, float64) error {
 	panic("unexpected UpdateBalance call")
 }
