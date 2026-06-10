@@ -2843,15 +2843,11 @@ func (s *GeminiMessagesCompatService) handleGeminiUpstreamError(ctx context.Cont
 				logger.LegacyPrintf("service.gemini_messages_compat", "[Gemini 429] Account %d (Google One OAuth, tier=%s, project=%s) rate limited, cooldown=%v", account.ID, tierID, projectID, time.Until(ra).Truncate(time.Second))
 			}
 		} else {
-			// API Key / AI Studio OAuth: PST 午夜
-			if ts := nextGeminiDailyResetUnix(); ts != nil {
-				ra = time.Unix(*ts, 0)
-				logger.LegacyPrintf("service.gemini_messages_compat", "[Gemini 429] Account %d (API Key/AI Studio, type=%s) rate limited, reset at PST midnight (%v)", account.ID, account.Type, ra)
-			} else {
-				// 兜底：5 分钟
-				ra = time.Now().Add(5 * time.Minute)
-				logger.LegacyPrintf("service.gemini_messages_compat", "[Gemini 429] Account %d rate limited, fallback to 5min", account.ID)
-			}
+			// API Key / AI Studio OAuth: generic 429s from custom upstreams can be
+			// transient or opaque (for example "openai_error"), so use the short
+			// configurable fallback instead of assuming a daily quota reset.
+			s.applyGemini429Fallback(ctx, account)
+			return
 		}
 		_ = s.accountRepo.SetRateLimited(ctx, account.ID, ra)
 		return
@@ -2862,6 +2858,17 @@ func (s *GeminiMessagesCompatService) handleGeminiUpstreamError(ctx context.Cont
 	_ = s.accountRepo.SetRateLimited(ctx, account.ID, resetTime)
 	logger.LegacyPrintf("service.gemini_messages_compat", "[Gemini 429] Account %d rate limited until %v (oauth_type=%s, tier=%s)",
 		account.ID, resetTime, oauthType, tierID)
+}
+
+func (s *GeminiMessagesCompatService) applyGemini429Fallback(ctx context.Context, account *Account) {
+	if s.rateLimitService != nil {
+		s.rateLimitService.apply429FallbackRateLimit(ctx, account, "gemini_no_reset_time")
+		return
+	}
+
+	ra := time.Now().Add(time.Duration(defaultRateLimit429CooldownSeconds) * time.Second)
+	_ = s.accountRepo.SetRateLimited(ctx, account.ID, ra)
+	logger.LegacyPrintf("service.gemini_messages_compat", "[Gemini 429] Account %d (API Key/AI Studio, type=%s) rate limited, fallback cooldown=%v", account.ID, account.Type, time.Until(ra).Truncate(time.Second))
 }
 
 // ParseGeminiRateLimitResetTime 解析 Gemini 格式的 429 响应，返回重置时间的 Unix 时间戳

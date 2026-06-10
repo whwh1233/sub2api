@@ -111,3 +111,21 @@ func TestHandle429_FallbackUsesDefaultSecondsWhenSettingServiceMissing(t *testin
 	require.Equal(t, int64(44), accountRepo.lastRateLimitID)
 	require.True(t, !accountRepo.lastRateLimitReset.Before(before.Add(5*time.Second)) && !accountRepo.lastRateLimitReset.After(after.Add(5*time.Second)))
 }
+
+func TestGeminiAPIKeyGeneric429UsesDefaultFallbackSeconds(t *testing.T) {
+	accountRepo := &rateLimit429AccountRepoStub{}
+	rlSvc := NewRateLimitService(accountRepo, nil, &config.Config{}, nil, nil)
+	svc := &GeminiMessagesCompatService{
+		accountRepo:      accountRepo,
+		rateLimitService: rlSvc,
+	}
+
+	account := &Account{ID: 45, Platform: PlatformGemini, Type: AccountTypeAPIKey}
+	before := time.Now()
+	svc.handleGeminiUpstreamError(context.Background(), account, http.StatusTooManyRequests, http.Header{}, []byte(`{"error":{"message":"openai_error"}}`))
+	after := time.Now()
+
+	require.Equal(t, 1, accountRepo.rateLimitCalls)
+	require.Equal(t, int64(45), accountRepo.lastRateLimitID)
+	require.True(t, !accountRepo.lastRateLimitReset.Before(before.Add(5*time.Second)) && !accountRepo.lastRateLimitReset.After(after.Add(5*time.Second)))
+}
