@@ -301,6 +301,200 @@ func ptr[T any](v T) *T {
 	return &v
 }
 
+func TestGatewayService_SelectAccountWithLoadAwareness_SkipsClaudeCodeOnlyAccountForNonClaudeCode(t *testing.T) {
+	ctx := context.Background()
+	groupID := int64(777)
+
+	repo := &mockAccountRepoForPlatform{
+		accounts: []Account{
+			{
+				ID:          1,
+				Platform:    PlatformAnthropic,
+				Priority:    1,
+				Status:      StatusActive,
+				Schedulable: true,
+				Concurrency: 5,
+				Extra: map[string]any{
+					accountExtraClaudeCodeOnlyGroupIDs: []any{float64(groupID)},
+				},
+				AccountGroups: []AccountGroup{{GroupID: groupID}},
+			},
+			{
+				ID:            2,
+				Platform:      PlatformAnthropic,
+				Priority:      2,
+				Status:        StatusActive,
+				Schedulable:   true,
+				Concurrency:   5,
+				AccountGroups: []AccountGroup{{GroupID: groupID}},
+			},
+		},
+		accountsByID: map[int64]*Account{},
+	}
+	for i := range repo.accounts {
+		repo.accountsByID[repo.accounts[i].ID] = &repo.accounts[i]
+	}
+
+	groupRepo := &mockGroupRepoForGateway{
+		groups: map[int64]*Group{
+			groupID: {
+				ID:       groupID,
+				Platform: PlatformAnthropic,
+				Status:   StatusActive,
+				Hydrated: true,
+			},
+		},
+	}
+
+	cfg := testConfig()
+	cfg.Gateway.Scheduling.LoadBatchEnabled = true
+
+	svc := &GatewayService{
+		accountRepo:        repo,
+		groupRepo:          groupRepo,
+		cache:              &mockGatewayCacheForPlatform{},
+		cfg:                cfg,
+		concurrencyService: NewConcurrencyService(&mockConcurrencyCache{}),
+	}
+
+	result, err := svc.SelectAccountWithLoadAwareness(ctx, &groupID, "", "claude-sonnet-4-5", nil, "", 0)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	require.NotNil(t, result.Account)
+	require.Equal(t, int64(2), result.Account.ID, "非 Claude Code 请求应跳过仅允许 Claude Code 的账号并继续使用同分组下一个优先级账号")
+}
+
+func TestGatewayService_SelectAccountWithLoadAwareness_SkipsStickyClaudeCodeOnlyAccountForNonClaudeCode(t *testing.T) {
+	ctx := context.Background()
+	groupID := int64(777)
+	sessionHash := "sticky-non-cc"
+
+	repo := &mockAccountRepoForPlatform{
+		accounts: []Account{
+			{
+				ID:          1,
+				Platform:    PlatformAnthropic,
+				Priority:    1,
+				Status:      StatusActive,
+				Schedulable: true,
+				Concurrency: 5,
+				Extra: map[string]any{
+					accountExtraClaudeCodeOnlyGroupIDs: []any{float64(groupID)},
+				},
+				AccountGroups: []AccountGroup{{GroupID: groupID}},
+			},
+			{
+				ID:            2,
+				Platform:      PlatformAnthropic,
+				Priority:      2,
+				Status:        StatusActive,
+				Schedulable:   true,
+				Concurrency:   5,
+				AccountGroups: []AccountGroup{{GroupID: groupID}},
+			},
+		},
+		accountsByID: map[int64]*Account{},
+	}
+	for i := range repo.accounts {
+		repo.accountsByID[repo.accounts[i].ID] = &repo.accounts[i]
+	}
+
+	groupRepo := &mockGroupRepoForGateway{
+		groups: map[int64]*Group{
+			groupID: {
+				ID:       groupID,
+				Platform: PlatformAnthropic,
+				Status:   StatusActive,
+				Hydrated: true,
+			},
+		},
+	}
+	cache := &mockGatewayCacheForPlatform{
+		sessionBindings: map[string]int64{sessionHash: 1},
+	}
+
+	cfg := testConfig()
+	cfg.Gateway.Scheduling.LoadBatchEnabled = true
+
+	svc := &GatewayService{
+		accountRepo:        repo,
+		groupRepo:          groupRepo,
+		cache:              cache,
+		cfg:                cfg,
+		concurrencyService: NewConcurrencyService(&mockConcurrencyCache{}),
+	}
+
+	result, err := svc.SelectAccountWithLoadAwareness(ctx, &groupID, sessionHash, "claude-sonnet-4-5", nil, "", 0)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	require.NotNil(t, result.Account)
+	require.Equal(t, int64(2), result.Account.ID, "非 Claude Code 请求不应继续命中已绑定的 Claude Code-only sticky 账号")
+	require.Equal(t, int64(2), cache.sessionBindings[sessionHash], "跳过 sticky 账号后应把会话重新绑定到实际选中的账号")
+}
+
+func TestGatewayService_SelectAccountWithLoadAwareness_AllowsClaudeCodeOnlyAccountForClaudeCode(t *testing.T) {
+	ctx := SetClaudeCodeClient(context.Background(), true)
+	groupID := int64(777)
+
+	repo := &mockAccountRepoForPlatform{
+		accounts: []Account{
+			{
+				ID:          1,
+				Platform:    PlatformAnthropic,
+				Priority:    1,
+				Status:      StatusActive,
+				Schedulable: true,
+				Concurrency: 5,
+				Extra: map[string]any{
+					accountExtraClaudeCodeOnlyGroupIDs: []any{float64(groupID)},
+				},
+				AccountGroups: []AccountGroup{{GroupID: groupID}},
+			},
+			{
+				ID:            2,
+				Platform:      PlatformAnthropic,
+				Priority:      2,
+				Status:        StatusActive,
+				Schedulable:   true,
+				Concurrency:   5,
+				AccountGroups: []AccountGroup{{GroupID: groupID}},
+			},
+		},
+		accountsByID: map[int64]*Account{},
+	}
+	for i := range repo.accounts {
+		repo.accountsByID[repo.accounts[i].ID] = &repo.accounts[i]
+	}
+
+	groupRepo := &mockGroupRepoForGateway{
+		groups: map[int64]*Group{
+			groupID: {
+				ID:       groupID,
+				Platform: PlatformAnthropic,
+				Status:   StatusActive,
+				Hydrated: true,
+			},
+		},
+	}
+
+	cfg := testConfig()
+	cfg.Gateway.Scheduling.LoadBatchEnabled = true
+
+	svc := &GatewayService{
+		accountRepo:        repo,
+		groupRepo:          groupRepo,
+		cache:              &mockGatewayCacheForPlatform{},
+		cfg:                cfg,
+		concurrencyService: NewConcurrencyService(&mockConcurrencyCache{}),
+	}
+
+	result, err := svc.SelectAccountWithLoadAwareness(ctx, &groupID, "", "claude-sonnet-4-5", nil, "", 0)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	require.NotNil(t, result.Account)
+	require.Equal(t, int64(1), result.Account.ID, "Claude Code 请求仍应允许使用标记账号")
+}
+
 // TestGatewayService_SelectAccountForModelWithPlatform_Anthropic 测试 anthropic 单平台选择
 func TestGatewayService_SelectAccountForModelWithPlatform_Anthropic(t *testing.T) {
 	ctx := context.Background()

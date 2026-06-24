@@ -1557,6 +1557,76 @@ func (a *Account) GetCodexCLIOnlyAllowedClients() []string {
 	return nil
 }
 
+const accountExtraClaudeCodeOnlyGroupIDs = "claude_code_only_group_ids"
+
+// IsClaudeCodeOnlyForGroup returns whether this account should only serve
+// Claude Code clients when it is selected through the given group.
+func (a *Account) IsClaudeCodeOnlyForGroup(groupID *int64) bool {
+	if a == nil || groupID == nil || *groupID <= 0 || a.Extra == nil {
+		return false
+	}
+	raw, ok := a.Extra[accountExtraClaudeCodeOnlyGroupIDs]
+	if !ok || raw == nil {
+		return false
+	}
+	return extraGroupIDListContains(raw, *groupID)
+}
+
+func extraGroupIDListContains(raw any, groupID int64) bool {
+	switch v := raw.(type) {
+	case []any:
+		for _, item := range v {
+			if parsed, ok := parseExtraInt64(item); ok && parsed == groupID {
+				return true
+			}
+		}
+	case []int64:
+		for _, item := range v {
+			if item == groupID {
+				return true
+			}
+		}
+	case []int:
+		for _, item := range v {
+			if int64(item) == groupID {
+				return true
+			}
+		}
+	case []float64:
+		for _, item := range v {
+			if int64(item) == groupID {
+				return true
+			}
+		}
+	case []string:
+		for _, item := range v {
+			if parsed, ok := parseExtraInt64(item); ok && parsed == groupID {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func parseExtraInt64(value any) (int64, bool) {
+	switch v := value.(type) {
+	case int64:
+		return v, true
+	case int:
+		return int64(v), true
+	case float64:
+		return int64(v), true
+	case json.Number:
+		parsed, err := v.Int64()
+		return parsed, err == nil
+	case string:
+		parsed, err := strconv.ParseInt(strings.TrimSpace(v), 10, 64)
+		return parsed, err == nil
+	default:
+		return 0, false
+	}
+}
+
 // WindowCostSchedulability 窗口费用调度状态
 type WindowCostSchedulability int
 
