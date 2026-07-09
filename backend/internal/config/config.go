@@ -61,6 +61,7 @@ const DefaultUpstreamResponseReadMaxBytes int64 = 128 * 1024 * 1024
 type Config struct {
 	Server                  ServerConfig                  `mapstructure:"server"`
 	Log                     LogConfig                     `mapstructure:"log"`
+	RawExchangeLog          RawExchangeLogConfig          `mapstructure:"raw_exchange_log"`
 	CORS                    CORSConfig                    `mapstructure:"cors"`
 	Security                SecurityConfig                `mapstructure:"security"`
 	Billing                 BillingConfig                 `mapstructure:"billing"`
@@ -125,6 +126,12 @@ type LogSamplingConfig struct {
 	Enabled    bool `mapstructure:"enabled"`
 	Initial    int  `mapstructure:"initial"`
 	Thereafter int  `mapstructure:"thereafter"`
+}
+
+type RawExchangeLogConfig struct {
+	Enabled      bool     `mapstructure:"enabled"`
+	MaxBodyBytes int64    `mapstructure:"max_body_bytes"`
+	SkipPaths    []string `mapstructure:"skip_paths"`
 }
 
 type GeminiConfig struct {
@@ -1432,6 +1439,7 @@ func load(allowMissingJWTSecret bool) (*Config, error) {
 	cfg.Log.Environment = strings.TrimSpace(cfg.Log.Environment)
 	cfg.Log.StacktraceLevel = strings.ToLower(strings.TrimSpace(cfg.Log.StacktraceLevel))
 	cfg.Log.Output.FilePath = strings.TrimSpace(cfg.Log.Output.FilePath)
+	cfg.RawExchangeLog.SkipPaths = normalizeStringSlice(cfg.RawExchangeLog.SkipPaths)
 	cfg.Gateway.ForcedCodexInstructionsTemplateFile = strings.TrimSpace(cfg.Gateway.ForcedCodexInstructionsTemplateFile)
 	if cfg.Gateway.ForcedCodexInstructionsTemplateFile != "" {
 		content, err := os.ReadFile(cfg.Gateway.ForcedCodexInstructionsTemplateFile)
@@ -1541,6 +1549,12 @@ func setDefaults() {
 	viper.SetDefault("log.sampling.enabled", false)
 	viper.SetDefault("log.sampling.initial", 100)
 	viper.SetDefault("log.sampling.thereafter", 100)
+
+	// Raw request/response exchange logging. Disabled by default because it logs
+	// headers and bodies exactly as received/sent, including secrets.
+	viper.SetDefault("raw_exchange_log.enabled", false)
+	viper.SetDefault("raw_exchange_log.max_body_bytes", int64(0))
+	viper.SetDefault("raw_exchange_log.skip_paths", []string{})
 
 	// CORS
 	viper.SetDefault("cors.allowed_origins", []string{})

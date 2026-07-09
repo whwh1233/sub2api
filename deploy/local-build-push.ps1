@@ -5,14 +5,23 @@
 # Usage:
 #   powershell -ExecutionPolicy Bypass -File .\deploy\local-build-push.ps1
 #   powershell -ExecutionPolicy Bypass -File .\deploy\local-build-push.ps1 -SkipSmokeTest
+#   powershell -ExecutionPolicy Bypass -File .\deploy\local-build-push.ps1 -Branch myvps2 -SkipSmokeTest
 
 param(
-    [switch]$SkipSmokeTest
+    [switch]$SkipSmokeTest,
+    [string]$Branch = ""
 )
 
 $ErrorActionPreference = "Stop"
 $RepoRoot = Split-Path -Parent $PSScriptRoot
 Set-Location $RepoRoot
+
+if ([string]::IsNullOrWhiteSpace($Branch)) {
+    $Branch = (git rev-parse --abbrev-ref HEAD).Trim()
+    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($Branch) -or $Branch -eq "HEAD") {
+        throw "Unable to determine current git branch. Pass -Branch explicitly."
+    }
+}
 
 $TotalSteps = if ($SkipSmokeTest) { 5 } else { 6 }
 
@@ -95,10 +104,14 @@ if (-not $staged) {
 $nextStep++
 
 # ---- 6. Push ----
-Step $nextStep "git push origin main"
-git push origin main
+Step $nextStep "git push origin $Branch"
+git push origin "HEAD:$Branch"
 if ($LASTEXITCODE -ne 0) { throw "git push failed" }
 
 Write-Host ""
 Write-Host "[OK] Local build and push complete. On VPS run:" -ForegroundColor Green
-Write-Host "  bash /root/sub2api/deploy/remote-pull-restart.sh" -ForegroundColor Green
+if ($Branch -eq "main") {
+    Write-Host "  bash /root/sub2api/deploy/remote-pull-restart.sh" -ForegroundColor Green
+} else {
+    Write-Host "  SUB2API_DEPLOY_BRANCH=$Branch bash /root/sub2api/deploy/remote-pull-restart.sh" -ForegroundColor Green
+}

@@ -3,6 +3,7 @@
 # VPS 端：备份当前二进制 → git pull → 重启 → 失败自动回滚
 # 用法（VPS 上作为 root）：
 #   bash /root/sub2api/deploy/remote-pull-restart.sh
+#   SUB2API_DEPLOY_BRANCH=myvps2 bash /root/sub2api/deploy/remote-pull-restart.sh
 #
 # 如果新版本有问题，手动回滚：
 #   bash /root/sub2api/deploy/remote-pull-restart.sh rollback
@@ -13,6 +14,7 @@ REPO_DIR="/root/sub2api"
 BINARY="$REPO_DIR/backend/sub2api-linux"
 BACKUP="$BINARY.prev"
 SERVICE="sub2api"
+DEPLOY_BRANCH="${SUB2API_DEPLOY_BRANCH:-main}"
 
 cd "$REPO_DIR"
 
@@ -67,7 +69,14 @@ else
 fi
 
 echo "==== [2/5] git pull ===="
-git pull origin main
+echo "  branch: $DEPLOY_BRANCH"
+git fetch origin "$DEPLOY_BRANCH"
+if git show-ref --verify --quiet "refs/heads/$DEPLOY_BRANCH"; then
+    git checkout "$DEPLOY_BRANCH"
+else
+    git checkout -B "$DEPLOY_BRANCH" "origin/$DEPLOY_BRANCH"
+fi
+git pull --ff-only origin "$DEPLOY_BRANCH"
 
 echo "==== [3/5] 校验新二进制 ===="
 [ -f "$BINARY" ] || { echo "ERROR: pull 后未找到 $BINARY" >&2; exit 1; }

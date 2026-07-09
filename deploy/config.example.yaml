@@ -67,6 +67,24 @@ server:
 run_mode: "standard"
 
 # =============================================================================
+# Raw Request/Response Logging
+# 原始请求/响应日志
+# =============================================================================
+# WARNING: when enabled, this logs headers, query strings, request bodies, and
+# response bodies exactly as received/sent. Secrets are not redacted.
+# 警告：开启后会按原文记录请求头、查询参数、请求体和响应体，不做任何密钥脱敏。
+raw_exchange_log:
+  # Keep disabled for normal production. Enable only on controlled test targets.
+  # 常规生产环境保持关闭，只在受控测试目标开启。
+  enabled: false
+  # 0 means unlimited capture. Set a positive value to truncate logged bodies.
+  # 0 表示不限；设置正数会截断写入日志的 body。
+  max_body_bytes: 0
+  # Exact paths to skip. Empty means no paths are skipped.
+  # 要跳过的精确路径。留空表示不跳过任何路径。
+  skip_paths: []
+
+# =============================================================================
 # CORS Configuration
 # 跨域资源共享 (CORS) 配置
 # =============================================================================
