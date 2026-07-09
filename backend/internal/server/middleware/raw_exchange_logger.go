@@ -62,6 +62,11 @@ func RawExchangeLogger(cfg config.RawExchangeLogConfig) gin.HandlerFunc {
 		accountID, hasAccountID := ctx.Value(ctxkey.AccountID).(int64)
 		platform, _ := ctx.Value(ctxkey.Platform).(string)
 		model, _ := ctx.Value(ctxkey.Model).(string)
+		forcePlatform, _ := ctx.Value(ctxkey.ForcePlatform).(string)
+
+		if !isClaudeRawExchange(c, platform, forcePlatform, model, requestBody) {
+			return
+		}
 
 		capturedRequest := captureBytes(requestBody, cfg.MaxBodyBytes)
 		record := map[string]any{
@@ -109,6 +114,45 @@ func RawExchangeLogger(cfg config.RawExchangeLogConfig) gin.HandlerFunc {
 			logger.FromContext(ctx).Warn("write raw exchange jsonl failed", zap.Error(err))
 		}
 	}
+}
+
+func isClaudeRawExchange(c *gin.Context, platform, forcePlatform, model string, requestBody []byte) bool {
+	for _, value := range []string{platform, forcePlatform} {
+		switch strings.ToLower(strings.TrimSpace(value)) {
+		case "anthropic", "claude":
+			return true
+		}
+	}
+
+	if containsClaudeSignal(model) {
+		return true
+	}
+	if c == nil || c.Request == nil {
+		return containsClaudeSignal(string(requestBody))
+	}
+
+	header := c.Request.Header
+	if strings.TrimSpace(header.Get("Anthropic-Version")) != "" || strings.TrimSpace(header.Get("Anthropic-Beta")) != "" {
+		return true
+	}
+	if containsClaudeSignal(header.Get("User-Agent")) {
+		return true
+	}
+
+	path := strings.ToLower(strings.TrimSpace(c.Request.URL.Path))
+	if path == "/v1/messages" || strings.HasPrefix(path, "/v1/messages/") {
+		return true
+	}
+	if strings.Contains(path, "anthropic") || strings.Contains(path, "claude") {
+		return true
+	}
+
+	return containsClaudeSignal(string(requestBody))
+}
+
+func containsClaudeSignal(value string) bool {
+	value = strings.ToLower(value)
+	return strings.Contains(value, "claude") || strings.Contains(value, "anthropic")
 }
 
 type rawExchangeResponseWriter struct {

@@ -124,11 +124,14 @@ func readRawExchangeLogRecords(path string, filter rawExchangeLogFilter) ([]rawE
 			lineNo++
 			trimmed := strings.TrimSpace(line)
 			if trimmed != "" && rawExchangeLineMatches(trimmed, filter) {
-				total++
 				var raw map[string]any
 				if err := json.Unmarshal([]byte(trimmed), &raw); err != nil {
 					return nil, 0, err
 				}
+				if !rawExchangeRawMatchesClaude(raw) {
+					continue
+				}
+				total++
 				item := rawExchangeLogItemFromRaw(lineNo, raw)
 				items = append(items, item)
 				if len(items) > filter.Limit {
@@ -169,6 +172,54 @@ func rawExchangeLineMatches(line string, filter rawExchangeLogFilter) bool {
 		return false
 	}
 	return true
+}
+
+func rawExchangeRawMatchesClaude(raw map[string]any) bool {
+	for _, key := range []string{"platform", "model", "path", "request_uri", "request_body"} {
+		if rawExchangeContainsClaudeSignal(rawString(raw, key)) {
+			return true
+		}
+	}
+
+	if strings.EqualFold(rawString(raw, "platform"), "anthropic") {
+		return true
+	}
+
+	headers, _ := raw["request_headers"].(map[string]any)
+	for key, value := range headers {
+		if strings.EqualFold(key, "Anthropic-Version") || strings.EqualFold(key, "Anthropic-Beta") {
+			return true
+		}
+		if strings.EqualFold(key, "User-Agent") && rawExchangeContainsClaudeSignal(rawExchangeHeaderValueString(value)) {
+			return true
+		}
+	}
+
+	return false
+}
+
+func rawExchangeContainsClaudeSignal(value string) bool {
+	value = strings.ToLower(value)
+	return strings.Contains(value, "claude") || strings.Contains(value, "anthropic")
+}
+
+func rawExchangeHeaderValueString(value any) string {
+	switch v := value.(type) {
+	case string:
+		return v
+	case []string:
+		return strings.Join(v, " ")
+	case []any:
+		parts := make([]string, 0, len(v))
+		for _, part := range v {
+			if s, ok := part.(string); ok {
+				parts = append(parts, s)
+			}
+		}
+		return strings.Join(parts, " ")
+	default:
+		return ""
+	}
 }
 
 func rawExchangeLogItemFromRaw(line int64, raw map[string]any) rawExchangeLogItem {

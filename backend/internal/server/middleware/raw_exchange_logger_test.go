@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"bytes"
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"net/http"
@@ -12,6 +13,7 @@ import (
 	"testing"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/ctxkey"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
 	"github.com/gin-gonic/gin"
 )
@@ -27,6 +29,8 @@ func TestRawExchangeLogger_CapturesOriginalRequestAndResponse(t *testing.T) {
 		FilePath: filepath.Join(t.TempDir(), "raw-exchange.jsonl"),
 	}))
 	r.POST("/v1/chat", func(c *gin.Context) {
+		ctx := context.WithValue(c.Request.Context(), ctxkey.Platform, "anthropic")
+		c.Request = c.Request.WithContext(ctx)
 		c.Header("X-Upstream-Token", "response-header-secret")
 		c.JSON(http.StatusAccepted, gin.H{
 			"message": "ok",
@@ -70,6 +74,68 @@ func TestRawExchangeLogger_CapturesOriginalRequestAndResponse(t *testing.T) {
 	}
 }
 
+func TestRawExchangeLogger_SkipsNonClaudeRequests(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	sink := initMiddlewareTestLogger(t)
+	logPath := filepath.Join(t.TempDir(), "raw-exchange.jsonl")
+
+	r := gin.New()
+	r.Use(RequestLogger())
+	r.Use(RawExchangeLogger(config.RawExchangeLogConfig{
+		Enabled:  true,
+		FilePath: logPath,
+	}))
+	r.POST("/v1/chat", func(c *gin.Context) {
+		ctx := context.WithValue(c.Request.Context(), ctxkey.Platform, "openai")
+		ctx = context.WithValue(ctx, ctxkey.Model, "gpt-test")
+		c.Request = c.Request.WithContext(ctx)
+		c.JSON(http.StatusOK, gin.H{"ok": true})
+	})
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/v1/chat", strings.NewReader(`{"model":"gpt-test"}`))
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status=%d", w.Code)
+	}
+	if hasRawExchangeEvent(sink.list()) {
+		t.Fatalf("raw exchange should not be logged for non-Claude requests")
+	}
+	if _, err := os.Stat(logPath); err == nil {
+		t.Fatalf("raw exchange file should not be created for non-Claude requests")
+	} else if !os.IsNotExist(err) {
+		t.Fatalf("stat raw exchange file: %v", err)
+	}
+}
+
+func TestRawExchangeLogger_LogsAnthropicHeaderRequests(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	sink := initMiddlewareTestLogger(t)
+
+	r := gin.New()
+	r.Use(RequestLogger())
+	r.Use(RawExchangeLogger(config.RawExchangeLogConfig{
+		Enabled:  true,
+		FilePath: filepath.Join(t.TempDir(), "raw-exchange.jsonl"),
+	}))
+	r.POST("/v1/messages", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"id": "msg_1"})
+	})
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/v1/messages", strings.NewReader(`{"model":"claude-sonnet-4-5"}`))
+	req.Header.Set("anthropic-version", "2023-06-01")
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status=%d", w.Code)
+	}
+	event := findRawExchangeEvent(t, sink.list())
+	assertStringField(t, event, "request_body", "claude-sonnet-4-5")
+	assertStringField(t, event, "path", "/v1/messages")
+}
+
 func TestRawExchangeLogger_DisabledDoesNotLog(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	sink := initMiddlewareTestLogger(t)
@@ -105,6 +171,8 @@ func TestRawExchangeLogger_WritesRawJSONLFileWithExactBodyBytes(t *testing.T) {
 	r.Use(RequestLogger())
 	r.Use(RawExchangeLogger(config.RawExchangeLogConfig{Enabled: true}))
 	r.POST("/v1/raw", func(c *gin.Context) {
+		ctx := context.WithValue(c.Request.Context(), ctxkey.Platform, "anthropic")
+		c.Request = c.Request.WithContext(ctx)
 		c.Header("X-Raw-Response", "response-secret")
 		c.Data(http.StatusCreated, "application/octet-stream", responseBody)
 	})
@@ -159,6 +227,15 @@ func findRawExchangeEvent(t *testing.T, events []*logger.LogEvent) *logger.LogEv
 	}
 	t.Fatalf("raw exchange log event not found in %d events", len(events))
 	return nil
+}
+
+func hasRawExchangeEvent(events []*logger.LogEvent) bool {
+	for _, event := range events {
+		if event != nil && event.Message == "http raw exchange captured" {
+			return true
+		}
+	}
+	return false
 }
 
 func assertStringField(t *testing.T, event *logger.LogEvent, field string, wantContains string) {
