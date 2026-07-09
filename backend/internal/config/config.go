@@ -132,6 +132,7 @@ type RawExchangeLogConfig struct {
 	Enabled      bool     `mapstructure:"enabled"`
 	MaxBodyBytes int64    `mapstructure:"max_body_bytes"`
 	SkipPaths    []string `mapstructure:"skip_paths"`
+	FilePath     string   `mapstructure:"file_path"`
 }
 
 type GeminiConfig struct {
@@ -1555,6 +1556,7 @@ func setDefaults() {
 	viper.SetDefault("raw_exchange_log.enabled", false)
 	viper.SetDefault("raw_exchange_log.max_body_bytes", int64(0))
 	viper.SetDefault("raw_exchange_log.skip_paths", []string{})
+	viper.SetDefault("raw_exchange_log.file_path", "")
 
 	// CORS
 	viper.SetDefault("cors.allowed_origins", []string{})

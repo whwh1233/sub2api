@@ -2,9 +2,14 @@ package middleware
 
 import (
 	"bytes"
+	"encoding/base64"
+	"encoding/json"
 	"io"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
@@ -14,6 +19,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 )
+
+var rawExchangeFileMu sync.Mutex
 
 // RawExchangeLogger captures raw request and response data for debugging
 // deployments. It intentionally does not redact anything.
@@ -57,44 +64,50 @@ func RawExchangeLogger(cfg config.RawExchangeLogConfig) gin.HandlerFunc {
 		model, _ := ctx.Value(ctxkey.Model).(string)
 
 		capturedRequest := captureBytes(requestBody, cfg.MaxBodyBytes)
-		fields := []zap.Field{
-			zap.String("component", "http.raw_exchange"),
-			zap.String("request_id", strings.TrimSpace(requestID)),
-			zap.String("client_request_id", strings.TrimSpace(clientRequestID)),
-			zap.String("method", c.Request.Method),
-			zap.String("path", c.Request.URL.Path),
-			zap.String("request_uri", c.Request.RequestURI),
-			zap.String("raw_query", c.Request.URL.RawQuery),
-			zap.Any("query", cloneValues(c.Request.URL.Query())),
-			zap.Any("path_params", cloneParams(c.Params)),
-			zap.Any("request_headers", cloneHeader(c.Request.Header)),
-			zap.String("request_body", capturedRequest.value),
-			zap.Int64("request_body_bytes", int64(len(requestBody))),
-			zap.Bool("request_body_truncated", capturedRequest.truncated),
-			zap.Int("status_code", c.Writer.Status()),
-			zap.Any("response_headers", cloneHeader(c.Writer.Header())),
-			zap.String("response_body", responseBody.String()),
-			zap.Int64("response_body_bytes", responseBody.TotalBytes()),
-			zap.Bool("response_body_truncated", responseBody.Truncated()),
-			zap.Int64("latency_ms", endTime.Sub(startTime).Milliseconds()),
-			zap.String("client_ip", ip.GetClientIP(c)),
-			zap.String("protocol", c.Request.Proto),
-			zap.Time("completed_at", endTime),
+		record := map[string]any{
+			"component":               "http.raw_exchange",
+			"request_id":              strings.TrimSpace(requestID),
+			"client_request_id":       strings.TrimSpace(clientRequestID),
+			"method":                  c.Request.Method,
+			"path":                    c.Request.URL.Path,
+			"request_uri":             c.Request.RequestURI,
+			"raw_query":               c.Request.URL.RawQuery,
+			"query":                   cloneValues(c.Request.URL.Query()),
+			"path_params":             cloneParams(c.Params),
+			"request_headers":         cloneHeader(c.Request.Header),
+			"request_body":            capturedRequest.value,
+			"request_body_base64":     base64.StdEncoding.EncodeToString(capturedRequest.bytes),
+			"request_body_bytes":      int64(len(requestBody)),
+			"request_body_truncated":  capturedRequest.truncated,
+			"status_code":             c.Writer.Status(),
+			"response_headers":        cloneHeader(c.Writer.Header()),
+			"response_body":           responseBody.String(),
+			"response_body_base64":    base64.StdEncoding.EncodeToString(responseBody.Bytes()),
+			"response_body_bytes":     responseBody.TotalBytes(),
+			"response_body_truncated": responseBody.Truncated(),
+			"latency_ms":              endTime.Sub(startTime).Milliseconds(),
+			"client_ip":               ip.GetClientIP(c),
+			"protocol":                c.Request.Proto,
+			"completed_at":            endTime.Format(time.RFC3339Nano),
 		}
 		if requestReadErr != nil {
-			fields = append(fields, zap.String("request_body_read_error", requestReadErr.Error()))
+			record["request_body_read_error"] = requestReadErr.Error()
 		}
 		if hasAccountID && accountID > 0 {
-			fields = append(fields, zap.Int64("account_id", accountID))
+			record["account_id"] = accountID
 		}
 		if platform != "" {
-			fields = append(fields, zap.String("platform", platform))
+			record["platform"] = platform
 		}
 		if model != "" {
-			fields = append(fields, zap.String("model", model))
+			record["model"] = model
 		}
 
+		fields := rawExchangeZapFields(record)
 		logger.FromContext(ctx).With(fields...).Info("http raw exchange captured")
+		if err := appendRawExchangeJSONL(cfg.FilePath, record); err != nil {
+			logger.FromContext(ctx).Warn("write raw exchange jsonl failed", zap.Error(err))
+		}
 	}
 }
 
@@ -119,6 +132,7 @@ func (w *rawExchangeResponseWriter) WriteString(data string) (int, error) {
 
 type capturedText struct {
 	value     string
+	bytes     []byte
 	truncated bool
 }
 
@@ -134,10 +148,11 @@ func readAndRestoreRequestBody(req *http.Request) ([]byte, error) {
 
 func captureBytes(data []byte, maxBytes int64) capturedText {
 	if maxBytes <= 0 || int64(len(data)) <= maxBytes {
-		return capturedText{value: string(data)}
+		return capturedText{value: string(data), bytes: append([]byte(nil), data...)}
 	}
 	return capturedText{
 		value:     string(data[:maxBytes]),
+		bytes:     append([]byte(nil), data[:maxBytes]...),
 		truncated: true,
 	}
 }
@@ -183,6 +198,10 @@ func (b *captureBuffer) String() string {
 	return b.buffer.String()
 }
 
+func (b *captureBuffer) Bytes() []byte {
+	return append([]byte(nil), b.buffer.Bytes()...)
+}
+
 func (b *captureBuffer) TotalBytes() int64 {
 	return b.total
 }
@@ -213,4 +232,63 @@ func cloneParams(params gin.Params) map[string]string {
 		out[param.Key] = param.Value
 	}
 	return out
+}
+
+func rawExchangeZapFields(record map[string]any) []zap.Field {
+	fields := make([]zap.Field, 0, len(record))
+	for key, value := range record {
+		switch v := value.(type) {
+		case string:
+			fields = append(fields, zap.String(key, v))
+		case int:
+			fields = append(fields, zap.Int(key, v))
+		case int64:
+			fields = append(fields, zap.Int64(key, v))
+		case bool:
+			fields = append(fields, zap.Bool(key, v))
+		default:
+			fields = append(fields, zap.Any(key, v))
+		}
+	}
+	return fields
+}
+
+// RawExchangeLogFilePath returns the JSONL file used by the test-only raw
+// exchange viewer. Empty config resolves under DATA_DIR so systemd deployments
+// keep the file with the rest of the app data.
+func RawExchangeLogFilePath(configured string) string {
+	configured = strings.TrimSpace(configured)
+	if configured != "" {
+		return configured
+	}
+	dataDir := strings.TrimSpace(os.Getenv("DATA_DIR"))
+	if dataDir == "" {
+		dataDir = "."
+	}
+	return filepath.Join(dataDir, "raw-exchange", "raw-exchange.jsonl")
+}
+
+func appendRawExchangeJSONL(configuredPath string, record map[string]any) error {
+	path := RawExchangeLogFilePath(configuredPath)
+	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+		return err
+	}
+
+	var buf bytes.Buffer
+	encoder := json.NewEncoder(&buf)
+	encoder.SetEscapeHTML(false)
+	if err := encoder.Encode(record); err != nil {
+		return err
+	}
+
+	rawExchangeFileMu.Lock()
+	defer rawExchangeFileMu.Unlock()
+
+	file, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0600)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = file.Close() }()
+	_, err = file.Write(buf.Bytes())
+	return err
 }

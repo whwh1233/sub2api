@@ -426,6 +426,16 @@ const routes: RouteRecordRaw[] = [
     }
   },
   {
+    path: '/admin/raw-exchange-logs',
+    name: 'AdminRawExchangeLogs',
+    component: () => import('@/views/admin/RawExchangeLogsView.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: true,
+      title: 'Raw Exchange Logs'
+    }
+  },
+  {
     path: '/admin/users',
     name: 'AdminUsers',
     component: () => import('@/views/admin/UsersView.vue'),

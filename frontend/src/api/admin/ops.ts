@@ -881,6 +881,44 @@ export interface OpsSystemLogSinkHealth {
   last_error?: string
 }
 
+export interface RawExchangeLogItem {
+  line: number
+  completed_at: string
+  request_id: string
+  client_request_id: string
+  method: string
+  path: string
+  request_uri: string
+  raw_query: string
+  status_code: number
+  latency_ms: number
+  client_ip: string
+  protocol: string
+  platform: string
+  model: string
+  account_id: number
+  request_body_bytes: number
+  request_body_truncated: boolean
+  response_body_bytes: number
+  response_body_truncated: boolean
+  raw: Record<string, any>
+}
+
+export interface RawExchangeLogQuery {
+  limit?: number
+  q?: string
+  request_id?: string
+  path?: string
+  method?: string
+  status_code?: number | null
+}
+
+export interface RawExchangeLogListResponse {
+  items: RawExchangeLogItem[]
+  total: number
+  path: string
+}
+
 export interface OpsErrorLog {
   id: number
   created_at: string
@@ -1258,6 +1296,11 @@ export async function getSystemLogSinkHealth(): Promise<OpsSystemLogSinkHealth> 
   return data
 }
 
+export async function listRawExchangeLogs(params: RawExchangeLogQuery): Promise<RawExchangeLogListResponse> {
+  const { data } = await apiClient.get<RawExchangeLogListResponse>('/admin/ops/raw-exchange-logs', { params })
+  return data
+}
+
 // Advanced settings (DB-backed)
 export async function getAdvancedSettings(): Promise<OpsAdvancedSettings> {
   const { data } = await apiClient.get<OpsAdvancedSettings>('/admin/ops/advanced-settings')
@@ -1330,7 +1373,8 @@ export const opsAPI = {
   updateMetricThresholds,
   listSystemLogs,
   cleanupSystemLogs,
-  getSystemLogSinkHealth
+  getSystemLogSinkHealth,
+  listRawExchangeLogs
 }
 
 export default opsAPI

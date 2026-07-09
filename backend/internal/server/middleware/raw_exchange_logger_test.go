@@ -1,8 +1,13 @@
 package middleware
 
 import (
+	"bytes"
+	"encoding/base64"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -17,7 +22,10 @@ func TestRawExchangeLogger_CapturesOriginalRequestAndResponse(t *testing.T) {
 
 	r := gin.New()
 	r.Use(RequestLogger())
-	r.Use(RawExchangeLogger(config.RawExchangeLogConfig{Enabled: true}))
+	r.Use(RawExchangeLogger(config.RawExchangeLogConfig{
+		Enabled:  true,
+		FilePath: filepath.Join(t.TempDir(), "raw-exchange.jsonl"),
+	}))
 	r.POST("/v1/chat", func(c *gin.Context) {
 		c.Header("X-Upstream-Token", "response-header-secret")
 		c.JSON(http.StatusAccepted, gin.H{
@@ -81,6 +89,64 @@ func TestRawExchangeLogger_DisabledDoesNotLog(t *testing.T) {
 		if event != nil && event.Message == "http raw exchange captured" {
 			t.Fatalf("raw exchange should not be logged when disabled: %+v", event.Fields)
 		}
+	}
+}
+
+func TestRawExchangeLogger_WritesRawJSONLFileWithExactBodyBytes(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	_ = initMiddlewareTestLogger(t)
+	dataDir := t.TempDir()
+	t.Setenv("DATA_DIR", dataDir)
+
+	requestBody := []byte{0xff, 'r', 'a', 'w'}
+	responseBody := []byte{0xfe, 'o', 'k'}
+
+	r := gin.New()
+	r.Use(RequestLogger())
+	r.Use(RawExchangeLogger(config.RawExchangeLogConfig{Enabled: true}))
+	r.POST("/v1/raw", func(c *gin.Context) {
+		c.Header("X-Raw-Response", "response-secret")
+		c.Data(http.StatusCreated, "application/octet-stream", responseBody)
+	})
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/v1/raw?token=query-secret", bytes.NewReader(requestBody))
+	req.Header.Set("Authorization", "Bearer request-secret")
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusCreated {
+		t.Fatalf("status=%d", w.Code)
+	}
+
+	logPath := filepath.Join(dataDir, "raw-exchange", "raw-exchange.jsonl")
+	data, err := os.ReadFile(logPath)
+	if err != nil {
+		t.Fatalf("read raw exchange log file: %v", err)
+	}
+	lines := strings.Split(strings.TrimSpace(string(data)), "\n")
+	if len(lines) != 1 {
+		t.Fatalf("log lines=%d, want 1: %q", len(lines), string(data))
+	}
+
+	var record map[string]any
+	if err := json.Unmarshal([]byte(lines[0]), &record); err != nil {
+		t.Fatalf("unmarshal raw exchange jsonl: %v\nline=%s", err, lines[0])
+	}
+	if got := record["request_body_base64"]; got != base64.StdEncoding.EncodeToString(requestBody) {
+		t.Fatalf("request_body_base64=%v", got)
+	}
+	if got := record["response_body_base64"]; got != base64.StdEncoding.EncodeToString(responseBody) {
+		t.Fatalf("response_body_base64=%v", got)
+	}
+	if got := record["raw_query"]; got != "token=query-secret" {
+		t.Fatalf("raw_query=%v", got)
+	}
+	headers, ok := record["request_headers"].(map[string]any)
+	if !ok {
+		t.Fatalf("request_headers type=%T", record["request_headers"])
+	}
+	if got := headers["Authorization"]; got == nil {
+		t.Fatalf("Authorization header missing in raw JSONL record")
 	}
 }
 
