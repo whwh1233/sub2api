@@ -95,6 +95,9 @@ func (m *mockAccountRepoForPlatform) List(ctx context.Context, params pagination
 func (m *mockAccountRepoForPlatform) ListWithFilters(ctx context.Context, params pagination.PaginationParams, platform, accountType, status, search string, groupID int64, privacyMode string) ([]Account, *pagination.PaginationResult, error) {
 	return nil, nil, nil
 }
+func (m *mockAccountRepoForPlatform) ListAllWithFilters(ctx context.Context, platform, accountType, status, search string, groupID int64, privacyMode string) ([]Account, error) {
+	return nil, nil
+}
 func (m *mockAccountRepoForPlatform) ListByGroup(ctx context.Context, groupID int64) ([]Account, error) {
 	return nil, nil
 }
@@ -180,6 +183,9 @@ func (m *mockAccountRepoForPlatform) ClearModelRateLimits(ctx context.Context, i
 func (m *mockAccountRepoForPlatform) UpdateSessionWindow(ctx context.Context, id int64, start, end *time.Time, status string) error {
 	return nil
 }
+func (m *mockAccountRepoForPlatform) UpdateSessionWindowEnd(ctx context.Context, id int64, end time.Time) error {
+	return nil
+}
 func (m *mockAccountRepoForPlatform) UpdateExtra(ctx context.Context, id int64, updates map[string]any) error {
 	return nil
 }
@@ -193,6 +199,14 @@ func (m *mockAccountRepoForPlatform) IncrementQuotaUsed(ctx context.Context, id 
 
 func (m *mockAccountRepoForPlatform) ResetQuotaUsed(ctx context.Context, id int64) error {
 	return nil
+}
+
+func (m *mockAccountRepoForPlatform) RevertProxyFallback(ctx context.Context, accountID int64) error {
+	return nil
+}
+
+func (m *mockAccountRepoForPlatform) ListShadowsByParent(ctx context.Context, parentID int64) ([]*Account, error) {
+	return nil, nil
 }
 
 // Verify interface implementation
@@ -299,6 +313,27 @@ func (m *mockGroupRepoForGateway) UpdateSortOrders(ctx context.Context, updates 
 
 func ptr[T any](v T) *T {
 	return &v
+}
+
+type gatewaySchedulingSnapshotCache struct {
+	SchedulerCache
+	snapshots          map[SchedulerBucket][]*Account
+	accountsByID       map[int64]*Account
+	getSnapshotBuckets []SchedulerBucket
+}
+
+func (c *gatewaySchedulingSnapshotCache) GetSnapshot(_ context.Context, bucket SchedulerBucket) ([]*Account, bool, error) {
+	c.getSnapshotBuckets = append(c.getSnapshotBuckets, bucket)
+	accounts, ok := c.snapshots[bucket]
+	return accounts, ok, nil
+}
+
+func (c *gatewaySchedulingSnapshotCache) GetAccount(_ context.Context, accountID int64) (*Account, error) {
+	account, ok := c.accountsByID[accountID]
+	if !ok {
+		return nil, ErrAccountNotFound
+	}
+	return account, nil
 }
 
 func TestGatewayService_SelectAccountWithLoadAwareness_SkipsClaudeCodeOnlyAccountForNonClaudeCode(t *testing.T) {
@@ -493,6 +528,144 @@ func TestGatewayService_SelectAccountWithLoadAwareness_AllowsClaudeCodeOnlyAccou
 	require.NotNil(t, result)
 	require.NotNil(t, result.Account)
 	require.Equal(t, int64(1), result.Account.ID, "Claude Code 请求仍应允许使用标记账号")
+}
+
+func TestGatewayService_SelectAccountWithLoadAwareness_SkipsClaudeCodeOnlyRoutingAccountFromSnapshot(t *testing.T) {
+	ctx := context.Background()
+	groupID := int64(778)
+	requestedModel := "claude-sonnet-4-5"
+
+	// Scheduler snapshots intentionally omit AccountGroups. The client gate must
+	// use the resolved group ID and the account Extra payload instead of relying
+	// on hydrated group edges.
+	snapshotAccounts := []*Account{
+		{
+			ID:          1,
+			Platform:    PlatformAnthropic,
+			Priority:    1,
+			Status:      StatusActive,
+			Schedulable: true,
+			Concurrency: 5,
+			Extra: map[string]any{
+				accountExtraClaudeCodeOnlyGroupIDs: []any{float64(groupID)},
+			},
+		},
+		{
+			ID:          2,
+			Platform:    PlatformAnthropic,
+			Priority:    2,
+			Status:      StatusActive,
+			Schedulable: true,
+			Concurrency: 5,
+		},
+	}
+	accountsByID := map[int64]*Account{
+		1: snapshotAccounts[0],
+		2: snapshotAccounts[1],
+	}
+	expectedBucket := SchedulerBucket{GroupID: groupID, Platform: PlatformAnthropic, Mode: SchedulerModeMixed}
+	snapshotCache := &gatewaySchedulingSnapshotCache{
+		snapshots: map[SchedulerBucket][]*Account{
+			expectedBucket: snapshotAccounts,
+		},
+		accountsByID: accountsByID,
+	}
+
+	groupRepo := &mockGroupRepoForGateway{
+		groups: map[int64]*Group{
+			groupID: {
+				ID:                  groupID,
+				Platform:            PlatformAnthropic,
+				Status:              StatusActive,
+				Hydrated:            true,
+				ModelRoutingEnabled: true,
+				ModelRouting: map[string][]int64{
+					requestedModel: {1, 2},
+				},
+			},
+		},
+	}
+
+	cfg := testConfig()
+	cfg.Gateway.Scheduling.LoadBatchEnabled = true
+	svc := &GatewayService{
+		accountRepo:        &mockAccountRepoForPlatform{accountsByID: accountsByID},
+		groupRepo:          groupRepo,
+		cache:              &mockGatewayCacheForPlatform{},
+		cfg:                cfg,
+		schedulerSnapshot:  &SchedulerSnapshotService{cache: snapshotCache},
+		concurrencyService: NewConcurrencyService(&mockConcurrencyCache{}),
+	}
+
+	result, err := svc.SelectAccountWithLoadAwareness(ctx, &groupID, "", requestedModel, nil, "", 0)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	require.NotNil(t, result.Account)
+	require.Equal(t, int64(2), result.Account.ID)
+	require.Equal(t, []SchedulerBucket{expectedBucket}, snapshotCache.getSnapshotBuckets)
+}
+
+func TestGatewayService_SelectAccountWithLoadAwareness_SkipsClaudeCodeOnlyAccountInMixedScheduling(t *testing.T) {
+	ctx := context.Background()
+	groupID := int64(779)
+	repo := &mockAccountRepoForPlatform{
+		accounts: []Account{
+			{
+				ID:          1,
+				Platform:    PlatformAntigravity,
+				Priority:    1,
+				Status:      StatusActive,
+				Schedulable: true,
+				Concurrency: 5,
+				Extra: map[string]any{
+					"mixed_scheduling":                 true,
+					accountExtraClaudeCodeOnlyGroupIDs: []any{float64(groupID)},
+				},
+				AccountGroups: []AccountGroup{{GroupID: groupID}},
+			},
+			{
+				ID:            2,
+				Platform:      PlatformAnthropic,
+				Priority:      2,
+				Status:        StatusActive,
+				Schedulable:   true,
+				Concurrency:   5,
+				AccountGroups: []AccountGroup{{GroupID: groupID}},
+			},
+		},
+		accountsByID: map[int64]*Account{},
+	}
+	for i := range repo.accounts {
+		repo.accountsByID[repo.accounts[i].ID] = &repo.accounts[i]
+	}
+
+	groupRepo := &mockGroupRepoForGateway{
+		groups: map[int64]*Group{
+			groupID: {
+				ID:       groupID,
+				Platform: PlatformAnthropic,
+				Status:   StatusActive,
+				Hydrated: true,
+			},
+		},
+	}
+	cfg := testConfig()
+	cfg.Gateway.Scheduling.LoadBatchEnabled = true
+	svc := &GatewayService{
+		accountRepo: repo,
+		groupRepo:   groupRepo,
+		cache:       &mockGatewayCacheForPlatform{},
+		cfg:         cfg,
+		// A nil concurrency service exercises the production legacy/mixed path
+		// through SelectAccountWithLoadAwareness rather than calling its helper.
+		concurrencyService: nil,
+	}
+
+	result, err := svc.SelectAccountWithLoadAwareness(ctx, &groupID, "", "claude-sonnet-4-5", nil, "", 0)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	require.NotNil(t, result.Account)
+	require.Equal(t, int64(2), result.Account.ID)
 }
 
 // TestGatewayService_SelectAccountForModelWithPlatform_Anthropic 测试 anthropic 单平台选择
@@ -1423,6 +1596,106 @@ func TestGatewayService_selectAccountWithMixedScheduling(t *testing.T) {
 		require.Equal(t, int64(2), acc.ID, "应选择优先级最高的账户（包含启用混合调度的antigravity）")
 	})
 
+	t.Run("混合调度-Gemini家族限流后跳过Antigravity账户", func(t *testing.T) {
+		resetAt := time.Now().Add(10 * time.Minute).Format(time.RFC3339)
+		repo := &mockAccountRepoForPlatform{
+			accounts: []Account{
+				{
+					ID:          1,
+					Platform:    PlatformAntigravity,
+					Priority:    1,
+					Status:      StatusActive,
+					Schedulable: true,
+					Extra: map[string]any{
+						"mixed_scheduling": true,
+						modelRateLimitsKey: map[string]any{
+							antigravityGeminiModelRateLimitKey: map[string]any{
+								"rate_limit_reset_at": resetAt,
+							},
+						},
+					},
+				},
+				{
+					ID:          2,
+					Platform:    PlatformAntigravity,
+					Priority:    1,
+					Status:      StatusActive,
+					Schedulable: true,
+					Extra: map[string]any{
+						"mixed_scheduling": true,
+						modelRateLimitsKey: map[string]any{
+							antigravityGeminiModelRateLimitKey: map[string]any{
+								"rate_limit_reset_at": resetAt,
+							},
+						},
+					},
+				},
+				{
+					ID:          3,
+					Platform:    PlatformAntigravity,
+					Priority:    2,
+					Status:      StatusActive,
+					Schedulable: true,
+					Extra:       map[string]any{"mixed_scheduling": true},
+				},
+			},
+			accountsByID: map[int64]*Account{},
+		}
+		for i := range repo.accounts {
+			repo.accountsByID[repo.accounts[i].ID] = &repo.accounts[i]
+		}
+
+		svc := &GatewayService{
+			accountRepo: repo,
+			cache:       &mockGatewayCacheForPlatform{},
+			cfg:         testConfig(),
+		}
+
+		acc, err := svc.selectAccountWithMixedScheduling(ctx, nil, "", "gemini-3-pro-preview", nil, PlatformGemini)
+		require.NoError(t, err)
+		require.NotNil(t, acc)
+		require.Equal(t, int64(3), acc.ID)
+	})
+
+	t.Run("混合调度-Gemini家族限流不影响Claude调度", func(t *testing.T) {
+		resetAt := time.Now().Add(10 * time.Minute).Format(time.RFC3339)
+		repo := &mockAccountRepoForPlatform{
+			accounts: []Account{
+				{
+					ID:          1,
+					Platform:    PlatformAntigravity,
+					Priority:    1,
+					Status:      StatusActive,
+					Schedulable: true,
+					Extra: map[string]any{
+						"mixed_scheduling": true,
+						modelRateLimitsKey: map[string]any{
+							antigravityGeminiModelRateLimitKey: map[string]any{
+								"rate_limit_reset_at": resetAt,
+							},
+						},
+					},
+				},
+				{ID: 2, Platform: PlatformAnthropic, Priority: 2, Status: StatusActive, Schedulable: true},
+			},
+			accountsByID: map[int64]*Account{},
+		}
+		for i := range repo.accounts {
+			repo.accountsByID[repo.accounts[i].ID] = &repo.accounts[i]
+		}
+
+		svc := &GatewayService{
+			accountRepo: repo,
+			cache:       &mockGatewayCacheForPlatform{},
+			cfg:         testConfig(),
+		}
+
+		acc, err := svc.selectAccountWithMixedScheduling(ctx, nil, "", "claude-sonnet-4-5", nil, PlatformAnthropic)
+		require.NoError(t, err)
+		require.NotNil(t, acc)
+		require.Equal(t, int64(1), acc.ID)
+	})
+
 	t.Run("混合调度-路由优先选择路由账号", func(t *testing.T) {
 		groupID := int64(30)
 		requestedModel := "claude-sonnet-4-5"
@@ -2177,6 +2450,10 @@ func (m *mockConcurrencyCache) GetAccountsLoadBatch(ctx context.Context, account
 }
 
 func (m *mockConcurrencyCache) CleanupExpiredAccountSlots(ctx context.Context, accountID int64) error {
+	return nil
+}
+
+func (m *mockConcurrencyCache) CleanupExpiredAccountSlotKeys(ctx context.Context) error {
 	return nil
 }
 

@@ -14,6 +14,13 @@ vi.mock('vue-router', () => ({
   useRouter: () => ({ push: pushMock }),
 }))
 
+vi.mock('@/composables/useBatchImageAccess', () => ({
+  useBatchImageAccess: () => ({
+    canUseBatchImage: { value: false },
+    refreshBatchImageAccess: vi.fn().mockResolvedValue(false),
+  }),
+}))
+
 vi.mock('vue-i18n', async () => {
   const actual = await vi.importActual<typeof import('vue-i18n')>('vue-i18n')
   const messages: Record<string, string> = {
@@ -122,6 +129,29 @@ describe('AppSidebar custom SVG styles', () => {
     expect(componentSource).toContain('display: block;')
     expect(componentSource).not.toContain('stroke: currentColor;')
     expect(componentSource).not.toContain('fill: none;')
+  })
+})
+
+describe('AppSidebar scroll position persistence', () => {
+  it('binds a template ref to the sidebar nav element', () => {
+    expect(componentSource).toContain('ref="sidebarNavRef"')
+    expect(componentSource).toContain('sidebar-nav')
+  })
+
+  it('declares sidebarNavRef in script setup', () => {
+    expect(componentSource).toContain("const sidebarNavRef = ref<HTMLElement | null>(null)")
+  })
+
+  it('saves scroll position on beforeUnmount', () => {
+    expect(componentSource).toContain('onBeforeUnmount')
+    expect(componentSource).toContain('appStore.sidebarScrollTop')
+    expect(componentSource).toContain('sidebarNavRef.value.scrollTop')
+  })
+
+  it('restores scroll position on mount', () => {
+    expect(componentSource).toContain('onMounted')
+    expect(componentSource).toContain('appStore.sidebarScrollTop')
+    expect(componentSource).toContain('nextTick')
   })
 })
 

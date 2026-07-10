@@ -84,6 +84,9 @@ func (s *userHandlerRepoStub) List(context.Context, pagination.PaginationParams)
 func (s *userHandlerRepoStub) ListWithFilters(context.Context, pagination.PaginationParams, service.UserListFilters) ([]service.User, *pagination.PaginationResult, error) {
 	return nil, nil, nil
 }
+func (s *userHandlerRepoStub) GetBalanceSummary(context.Context, float64) (*service.BalanceSummary, error) {
+	return &service.BalanceSummary{}, nil
+}
 func (s *userHandlerRepoStub) UpdateBalance(context.Context, int64, float64) error { return nil }
 func (s *userHandlerRepoStub) DeductBalance(context.Context, int64, float64) error { return nil }
 func (s *userHandlerRepoStub) UpdateConcurrency(context.Context, int64, int) error { return nil }
@@ -118,6 +121,9 @@ func (s *userHandlerRepoStub) RemoveGroupFromUserAllowedGroups(context.Context, 
 func (s *userHandlerRepoStub) UpdateTotpSecret(context.Context, int64, *string) error { return nil }
 func (s *userHandlerRepoStub) EnableTotp(context.Context, int64) error                { return nil }
 func (s *userHandlerRepoStub) DisableTotp(context.Context, int64) error               { return nil }
+func (s *userHandlerRepoStub) GetByIDIncludeDeleted(ctx context.Context, id int64) (*service.User, error) {
+	return s.GetByID(ctx, id)
+}
 func (s *userHandlerRepoStub) ListUserAuthIdentities(context.Context, int64) ([]service.UserAuthIdentityRecord, error) {
 	out := make([]service.UserAuthIdentityRecord, len(s.identities))
 	copy(out, s.identities)

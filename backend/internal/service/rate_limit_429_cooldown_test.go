@@ -97,6 +97,45 @@ func TestHandle429_FallbackDisabledSkipsLocalMark(t *testing.T) {
 	require.Zero(t, accountRepo.rateLimitCalls)
 }
 
+// Anthropic 无 reset 头的 429（如 Extra usage required）也应走兜底冷却，
+// 否则账号永不冷却，调度器会让每个请求反复撞同一批 429 账号（旋转木马）。
+func TestHandle429_AnthropicNoResetTimeUsesFallbackCooldown(t *testing.T) {
+	accountRepo := &rateLimit429AccountRepoStub{}
+	settingRepo := newMockSettingRepo()
+	data, _ := json.Marshal(RateLimit429CooldownSettings{Enabled: true, CooldownSeconds: 12})
+	settingRepo.data[SettingKeyRateLimit429CooldownSettings] = string(data)
+
+	settingSvc := NewSettingService(settingRepo, &config.Config{})
+	svc := NewRateLimitService(accountRepo, nil, &config.Config{}, nil, nil)
+	svc.SetSettingService(settingSvc)
+
+	account := &Account{ID: 45, Platform: PlatformAnthropic, Type: AccountTypeOAuth}
+	before := time.Now()
+	svc.handle429(context.Background(), account, http.Header{}, []byte(`{"error":{"type":"rate_limit_error","message":"Extra usage required"}}`))
+	after := time.Now()
+
+	require.Equal(t, 1, accountRepo.rateLimitCalls)
+	require.Equal(t, int64(45), accountRepo.lastRateLimitID)
+	require.True(t, !accountRepo.lastRateLimitReset.Before(before.Add(12*time.Second)) && !accountRepo.lastRateLimitReset.After(after.Add(12*time.Second)))
+}
+
+// 管理端关闭兜底冷却时，Anthropic 无 reset 头的 429 保持旧行为：不标记账号。
+func TestHandle429_AnthropicNoResetTimeFallbackDisabledSkipsMark(t *testing.T) {
+	accountRepo := &rateLimit429AccountRepoStub{}
+	settingRepo := newMockSettingRepo()
+	data, _ := json.Marshal(RateLimit429CooldownSettings{Enabled: false, CooldownSeconds: 12})
+	settingRepo.data[SettingKeyRateLimit429CooldownSettings] = string(data)
+
+	settingSvc := NewSettingService(settingRepo, &config.Config{})
+	svc := NewRateLimitService(accountRepo, nil, &config.Config{}, nil, nil)
+	svc.SetSettingService(settingSvc)
+
+	account := &Account{ID: 46, Platform: PlatformAnthropic, Type: AccountTypeOAuth}
+	svc.handle429(context.Background(), account, http.Header{}, []byte(`{"error":{"type":"rate_limit_error","message":"Extra usage required"}}`))
+
+	require.Zero(t, accountRepo.rateLimitCalls)
+}
+
 func TestHandle429_FallbackUsesDefaultSecondsWhenSettingServiceMissing(t *testing.T) {
 	accountRepo := &rateLimit429AccountRepoStub{}
 	cfg := &config.Config{}
@@ -128,4 +167,75 @@ func TestGeminiAPIKeyGeneric429UsesDefaultFallbackSeconds(t *testing.T) {
 	require.Equal(t, 1, accountRepo.rateLimitCalls)
 	require.Equal(t, int64(45), accountRepo.lastRateLimitID)
 	require.True(t, !accountRepo.lastRateLimitReset.Before(before.Add(5*time.Second)) && !accountRepo.lastRateLimitReset.After(after.Add(5*time.Second)))
+}
+
+func TestGeminiAPIKeyAndAIStudioGeneric429UseConfiguredFallbackSeconds(t *testing.T) {
+	tests := []struct {
+		name    string
+		account *Account
+	}{
+		{
+			name:    "api_key",
+			account: &Account{ID: 46, Platform: PlatformGemini, Type: AccountTypeAPIKey},
+		},
+		{
+			name: "ai_studio_oauth",
+			account: &Account{
+				ID:          47,
+				Platform:    PlatformGemini,
+				Type:        AccountTypeOAuth,
+				Credentials: map[string]any{"oauth_type": "ai_studio"},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			accountRepo := &rateLimit429AccountRepoStub{}
+			settingRepo := newMockSettingRepo()
+			data, _ := json.Marshal(RateLimit429CooldownSettings{Enabled: true, CooldownSeconds: 12})
+			settingRepo.data[SettingKeyRateLimit429CooldownSettings] = string(data)
+
+			settingSvc := NewSettingService(settingRepo, &config.Config{})
+			rlSvc := NewRateLimitService(accountRepo, nil, &config.Config{}, nil, nil)
+			rlSvc.SetSettingService(settingSvc)
+			svc := &GeminiMessagesCompatService{
+				accountRepo:      accountRepo,
+				rateLimitService: rlSvc,
+			}
+
+			before := time.Now()
+			svc.handleGeminiUpstreamError(context.Background(), tt.account, http.StatusTooManyRequests, http.Header{}, []byte(`{"error":{"message":"openai_error"}}`))
+			after := time.Now()
+
+			require.Equal(t, 1, accountRepo.rateLimitCalls)
+			require.Equal(t, tt.account.ID, accountRepo.lastRateLimitID)
+			require.True(t, !accountRepo.lastRateLimitReset.Before(before.Add(12*time.Second)) && !accountRepo.lastRateLimitReset.After(after.Add(12*time.Second)))
+		})
+	}
+}
+
+func TestGeminiAPIKeyDailyQuotaKeepsDailyResetWhenFallbackDisabled(t *testing.T) {
+	accountRepo := &rateLimit429AccountRepoStub{}
+	settingRepo := newMockSettingRepo()
+	data, _ := json.Marshal(RateLimit429CooldownSettings{Enabled: false, CooldownSeconds: 12})
+	settingRepo.data[SettingKeyRateLimit429CooldownSettings] = string(data)
+
+	settingSvc := NewSettingService(settingRepo, &config.Config{})
+	rlSvc := NewRateLimitService(accountRepo, nil, &config.Config{}, nil, nil)
+	rlSvc.SetSettingService(settingSvc)
+	svc := &GeminiMessagesCompatService{
+		accountRepo:      accountRepo,
+		rateLimitService: rlSvc,
+	}
+	account := &Account{ID: 48, Platform: PlatformGemini, Type: AccountTypeAPIKey}
+
+	resetBefore := geminiDailyResetTime(time.Now()).Unix()
+	svc.handleGeminiUpstreamError(context.Background(), account, http.StatusTooManyRequests, http.Header{}, []byte(`{"error":{"message":"quota per day exceeded"}}`))
+	resetAfter := geminiDailyResetTime(time.Now()).Unix()
+
+	require.Equal(t, 1, accountRepo.rateLimitCalls, "explicit daily quota must bypass the disabled generic fallback")
+	require.Equal(t, int64(48), accountRepo.lastRateLimitID)
+	require.GreaterOrEqual(t, accountRepo.lastRateLimitReset.Unix(), resetBefore)
+	require.LessOrEqual(t, accountRepo.lastRateLimitReset.Unix(), resetAfter)
 }

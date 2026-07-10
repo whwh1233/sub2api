@@ -39,8 +39,8 @@ vi.mock('vue-i18n', async () => {
 const testDir = dirname(fileURLToPath(import.meta.url))
 const viewPath = resolve(testDir, '../CommunityView.vue')
 const routerPath = resolve(testDir, '../../../router/index.ts')
-const zhLocalePath = resolve(testDir, '../../../i18n/locales/zh.ts')
-const enLocalePath = resolve(testDir, '../../../i18n/locales/en.ts')
+const zhLocalePath = resolve(testDir, '../../../i18n/locales/zh/community.ts')
+const enLocalePath = resolve(testDir, '../../../i18n/locales/en/community.ts')
 
 describe('CommunityView', () => {
   it('is routed as an authenticated user page', () => {
