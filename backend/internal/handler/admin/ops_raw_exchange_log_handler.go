@@ -25,6 +25,8 @@ type rawExchangeLogFilter struct {
 	StatusCode int
 }
 
+const rawExchangeLogMaxSummaries = 20
+
 type rawExchangeLogItem struct {
 	Line                  int64          `json:"line"`
 	Offset                int64          `json:"offset"`
@@ -102,8 +104,8 @@ func parseRawExchangeLogFilter(c *gin.Context) (rawExchangeLogFilter, error) {
 		if err != nil || n <= 0 {
 			return filter, errors.New("invalid limit")
 		}
-		if n > 200 {
-			n = 200
+		if n > rawExchangeLogMaxSummaries {
+			n = rawExchangeLogMaxSummaries
 		}
 		filter.Limit = n
 	}
@@ -125,8 +127,8 @@ func readRawExchangeLogRecords(path string, filter rawExchangeLogFilter) ([]rawE
 	if filter.Limit <= 0 {
 		filter.Limit = 100
 	}
-	if filter.Limit > 200 {
-		filter.Limit = 200
+	if filter.Limit > rawExchangeLogMaxSummaries {
+		filter.Limit = rawExchangeLogMaxSummaries
 	}
 
 	items := make([]rawExchangeLogItem, 0, filter.Limit)

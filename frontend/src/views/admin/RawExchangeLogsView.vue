@@ -52,7 +52,7 @@
           </div>
           <div>
             <label class="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Limit</label>
-            <input v-model.number="filters.limit" type="number" min="1" max="200" class="input w-full" />
+            <input v-model.number="filters.limit" type="number" min="1" max="20" class="input w-full" />
           </div>
         </div>
         <div class="mt-3 flex justify-end">
@@ -211,7 +211,7 @@ import { useAppStore } from '@/stores'
 const appStore = useAppStore()
 
 const filters = reactive({
-  limit: 100,
+  limit: 20,
   q: '',
   request_id: '',
   path: '',
@@ -271,7 +271,7 @@ const selectedSummary = computed(() => {
 
 function buildQuery(): RawExchangeLogQuery {
   const query: RawExchangeLogQuery = {
-    limit: clampLimit(Number(filters.limit) || 100),
+    limit: clampLimit(Number(filters.limit) || 20),
   }
 
   if (filters.q) query.q = filters.q
@@ -285,7 +285,7 @@ function buildQuery(): RawExchangeLogQuery {
 
 function clampLimit(limit: number): number {
   if (!Number.isFinite(limit)) return 100
-  return Math.min(200, Math.max(1, Math.trunc(limit)))
+  return Math.min(20, Math.max(1, Math.trunc(limit)))
 }
 
 async function loadLogs(): Promise<void> {
@@ -312,7 +312,7 @@ async function loadLogs(): Promise<void> {
 }
 
 function clearFilters(): void {
-  filters.limit = 100
+  filters.limit = 20
   filters.q = ''
   filters.request_id = ''
   filters.path = ''
