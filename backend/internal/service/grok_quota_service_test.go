@@ -86,7 +86,7 @@ func TestGrokQuotaServiceProbeUsageStoresHeaders(t *testing.T) {
 	result, err := svc.ProbeUsage(context.Background(), 42)
 	require.NoError(t, err)
 	require.Equal(t, http.StatusOK, result.StatusCode)
-	require.Equal(t, "grok-4.3", result.Model)
+	require.Equal(t, "grok-4.5", result.Model)
 	require.True(t, result.HeadersObserved)
 	require.NotNil(t, result.Snapshot)
 	require.True(t, result.Snapshot.HeadersObserved)
@@ -100,8 +100,8 @@ func TestGrokQuotaServiceProbeUsageStoresHeaders(t *testing.T) {
 	require.Equal(t, "Bearer access-token", upstream.lastReq.Header.Get("Authorization"))
 	require.Contains(t, upstream.lastReq.Header.Get("User-Agent"), "grok-pager/"+xai.GrokCLIClientVersion)
 	require.Equal(t, xai.GrokCLIClientVersion, upstream.lastReq.Header.Get("x-grok-client-version"))
-	require.Equal(t, "grok-4.3", upstream.lastReq.Header.Get("x-grok-model-override"))
-	require.Equal(t, "grok-4.3", gjson.GetBytes(upstream.lastBody, "model").String())
+	require.Equal(t, "grok-4.5", upstream.lastReq.Header.Get("x-grok-model-override"))
+	require.Equal(t, "grok-4.5", gjson.GetBytes(upstream.lastBody, "model").String())
 	require.Contains(t, string(upstream.lastBody), `"max_output_tokens":1`)
 	require.Contains(t, string(upstream.lastBody), `"store":false`)
 	require.NotNil(t, repo.updates[42][grokQuotaSnapshotExtraKey])
@@ -138,8 +138,8 @@ func TestGrokQuotaServiceProbeUsageIgnoresAccountGrokMapping(t *testing.T) {
 
 	result, err := svc.ProbeUsage(context.Background(), 47)
 	require.NoError(t, err)
-	require.Equal(t, "grok-4.3", result.Model)
-	require.Equal(t, "grok-4.3", gjson.GetBytes(upstream.lastBody, "model").String())
+	require.Equal(t, "grok-4.5", result.Model)
+	require.Equal(t, "grok-4.5", gjson.GetBytes(upstream.lastBody, "model").String())
 	require.NotContains(t, string(upstream.lastBody), "grok-composer")
 }
 
@@ -171,7 +171,7 @@ func TestGrokQuotaServiceProbeUsageReportsProbeModelOnUpstreamError(t *testing.T
 	_, err := svc.ProbeUsage(context.Background(), 48)
 	require.Error(t, err)
 	require.Equal(t, "GROK_QUOTA_PROBE_UPSTREAM_ERROR", infraerrors.Reason(err))
-	require.Contains(t, infraerrors.Message(err), `probe model "grok-4.3"`)
+	require.Contains(t, infraerrors.Message(err), `probe model "grok-4.5"`)
 }
 
 func TestGrokQuotaServiceProbeUsageLoadsProxyWhenAccountEdgeMissing(t *testing.T) {
