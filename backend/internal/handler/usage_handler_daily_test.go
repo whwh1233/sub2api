@@ -84,7 +84,7 @@ func newDailyUsageTestRouter(usageRepo *dailyUsageRepoStub, apiKeyRepo *dailyUsa
 	gin.SetMode(gin.TestMode)
 	usageSvc := service.NewUsageService(usageRepo, nil, nil, nil)
 	apiKeySvc := service.NewAPIKeyService(apiKeyRepo, nil, nil, nil, nil, nil, nil)
-	handler := NewUsageHandler(usageSvc, apiKeySvc)
+	handler := NewUsageHandler(usageSvc, apiKeySvc, nil, nil)
 	router := gin.New()
 	router.Use(func(c *gin.Context) {
 		c.Set(string(middleware2.ContextKeyUser), middleware2.AuthSubject{UserID: userID})
@@ -97,7 +97,7 @@ func newDailyUsageTestRouter(usageRepo *dailyUsageRepoStub, apiKeyRepo *dailyUsa
 func newDailyLeaderboardTestRouter(usageRepo *dailyUsageRepoStub, userID int64) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	usageSvc := service.NewUsageService(usageRepo, nil, nil, nil)
-	handler := NewUsageHandler(usageSvc, nil)
+	handler := NewUsageHandler(usageSvc, nil, nil, nil)
 	router := gin.New()
 	router.Use(func(c *gin.Context) {
 		c.Set(string(middleware2.ContextKeyUser), middleware2.AuthSubject{UserID: userID})

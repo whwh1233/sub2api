@@ -1,6 +1,6 @@
 # local-build-push.ps1
 # Build frontend, build Windows binary for local smoke test, then build Linux
-# binary and push to GitHub.
+# binary, package it as a verified gzip artifact, and push to GitHub.
 #
 # Usage:
 #   powershell -ExecutionPolicy Bypass -File .\deploy\local-build-push.ps1
@@ -87,18 +87,82 @@ try {
 }
 $linSize = (Get-Item "$RepoRoot\backend\sub2api-linux").Length / 1MB
 Write-Host ("  Linux binary: {0:N1} MB" -f $linSize) -ForegroundColor Green
+
+$linuxBinary = "$RepoRoot\backend\sub2api-linux"
+$linuxArtifact = "$linuxBinary.gz"
+$linuxChecksum = "$linuxBinary.sha256"
+$verifyBinary = "$linuxBinary.verify"
+Remove-Item $linuxArtifact, $linuxChecksum, $verifyBinary -Force -ErrorAction SilentlyContinue
+
+$input = [System.IO.File]::OpenRead($linuxBinary)
+$output = [System.IO.File]::Create($linuxArtifact)
+try {
+    $gzip = [System.IO.Compression.GZipStream]::new(
+        $output,
+        [System.IO.Compression.CompressionLevel]::SmallestSize,
+        $true
+    )
+    try {
+        $input.CopyTo($gzip)
+    } finally {
+        $gzip.Dispose()
+    }
+} finally {
+    $input.Dispose()
+    $output.Dispose()
+}
+
+$rawHash = (Get-FileHash $linuxBinary -Algorithm SHA256).Hash.ToLowerInvariant()
+Set-Content -LiteralPath $linuxChecksum -Value "$rawHash  sub2api-linux" -Encoding ASCII
+
+$compressedInput = [System.IO.File]::OpenRead($linuxArtifact)
+$verifyOutput = [System.IO.File]::Create($verifyBinary)
+try {
+    $gzip = [System.IO.Compression.GZipStream]::new(
+        $compressedInput,
+        [System.IO.Compression.CompressionMode]::Decompress,
+        $true
+    )
+    try {
+        $gzip.CopyTo($verifyOutput)
+    } finally {
+        $gzip.Dispose()
+    }
+} finally {
+    $compressedInput.Dispose()
+    $verifyOutput.Dispose()
+}
+
+$verifyHash = (Get-FileHash $verifyBinary -Algorithm SHA256).Hash.ToLowerInvariant()
+Remove-Item $verifyBinary -Force
+if ($verifyHash -ne $rawHash) {
+    throw "gzip round-trip checksum mismatch: expected $rawHash but got $verifyHash"
+}
+
+$artifactSize = (Get-Item $linuxArtifact).Length
+if ($artifactSize -ge 100MB) {
+    throw "compressed Linux artifact is still too large for GitHub: $artifactSize bytes"
+}
+Write-Host ("  Gzip artifact: {0:N1} MB; raw SHA256: {1}" -f ($artifactSize / 1MB), $rawHash) -ForegroundColor Green
+Write-Host ""
+Write-Host "  Press ENTER to stage, commit, and push the verified compressed artifact," -ForegroundColor Cyan
+Write-Host "  or Ctrl+C to stop for artifact inspection." -ForegroundColor Cyan
+[void](Read-Host)
 $nextStep++
 
-# ---- 5. Commit Linux binary ----
-Step $nextStep "Commit Linux binary to git"
+# ---- 5. Commit compressed Linux artifact ----
+Step $nextStep "Commit compressed Linux artifact to git"
 Set-Location $RepoRoot
-git add backend/sub2api-linux
+git rm --cached --ignore-unmatch backend/sub2api-linux
+git add .gitignore deploy/local-build-push.ps1 deploy/remote-pull-restart.sh
+git add -f deploy/tests/test-compressed-release.ps1 deploy/tests/test-remote-artifact-install.sh
+git add -f backend/sub2api-linux.gz backend/sub2api-linux.sha256
 $staged = git diff --cached --name-only
 if (-not $staged) {
     Write-Host "  Binary unchanged, skipping commit" -ForegroundColor Yellow
 } else {
     $ts = Get-Date -Format "yyyy-MM-dd HH:mm"
-    git commit -m "build: linux binary $ts"
+    git commit -m "build: compressed linux binary $ts"
     if ($LASTEXITCODE -ne 0) { throw "git commit failed" }
 }
 $nextStep++
