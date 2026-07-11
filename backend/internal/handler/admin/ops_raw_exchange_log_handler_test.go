@@ -1,8 +1,10 @@
 package admin
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -23,8 +25,8 @@ func TestReadRawExchangeLogRecords_ReturnsNewestMatchesWithFullRawEvent(t *testi
 	if err != nil {
 		t.Fatalf("readRawExchangeLogRecords() error: %v", err)
 	}
-	if total != 2 {
-		t.Fatalf("total=%d, want 2 Claude records only", total)
+	if total != 1 {
+		t.Fatalf("total=%d, want returned summary count", total)
 	}
 	if len(items) != 1 {
 		t.Fatalf("items=%d, want 1", len(items))
@@ -36,13 +38,61 @@ func TestReadRawExchangeLogRecords_ReturnsNewestMatchesWithFullRawEvent(t *testi
 	if item.Stage != "upstream_exchange" || item.Operation != "messages" || item.Attempt != 2 || item.UserID == nil || *item.UserID != 77 {
 		t.Fatalf("upstream summary mismatch: %+v", item)
 	}
-	if item.Raw["request_body"] != "request secret" {
-		t.Fatalf("raw request_body=%v", item.Raw["request_body"])
+	if item.Raw != nil {
+		t.Fatalf("list should not return raw payload: %#v", item.Raw)
 	}
-	if item.Raw["response_body"] != "response secret" {
-		t.Fatalf("raw response_body=%v", item.Raw["response_body"])
+	detail, err := readRawExchangeLogRecordAt(path, item.Offset)
+	if err != nil {
+		t.Fatal(err)
 	}
-	if item.Raw["raw_query"] != "token=query-secret" {
-		t.Fatalf("raw_query=%v", item.Raw["raw_query"])
+	if detail.Raw["request_body"] != "request secret" || detail.Raw["response_body"] != "response secret" {
+		t.Fatalf("detail raw=%#v", detail.Raw)
+	}
+	if detail.Raw["raw_query"] != "token=query-secret" {
+		t.Fatalf("raw_query=%v", detail.Raw["raw_query"])
+	}
+}
+
+func TestReadRawExchangeLogRecordsReturnsSummariesAndOffsets(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "raw-exchange.jsonl")
+	content := strings.Join([]string{
+		`{"request_id":"one","platform":"anthropic","stage":"client_exchange","request_body":"large-secret-one","response_body":"response-one"}`,
+		`{"request_id":"two","platform":"anthropic","stage":"upstream_exchange","request_body":"large-secret-two","response_body":"response-two"}`,
+	}, "\n") + "\n"
+	if err := os.WriteFile(path, []byte(content), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	items, total, err := readRawExchangeLogRecords(path, rawExchangeLogFilter{Limit: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if total != 1 || len(items) != 1 || items[0].RequestID != "two" {
+		t.Fatalf("items=%+v total=%d", items, total)
+	}
+	if items[0].Offset <= 0 {
+		t.Fatalf("offset=%d", items[0].Offset)
+	}
+	if items[0].Raw != nil {
+		t.Fatalf("list leaked full raw record: %#v", items[0].Raw)
+	}
+
+	detail, err := readRawExchangeLogRecordAt(path, items[0].Offset)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if detail.Raw["request_body"] != "large-secret-two" || detail.Raw["response_body"] != "response-two" {
+		t.Fatalf("detail=%#v", detail.Raw)
+	}
+}
+
+func TestReadRawExchangeLogRecordAtRejectsInvalidOffset(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "raw-exchange.jsonl")
+	data, _ := json.Marshal(map[string]any{"platform": "anthropic"})
+	if err := os.WriteFile(path, append(data, '\n'), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := readRawExchangeLogRecordAt(path, -1); err == nil {
+		t.Fatal("expected invalid offset error")
 	}
 }

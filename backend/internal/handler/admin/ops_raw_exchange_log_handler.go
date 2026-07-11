@@ -2,6 +2,7 @@ package admin
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
 	"errors"
 	"io"
@@ -26,6 +27,7 @@ type rawExchangeLogFilter struct {
 
 type rawExchangeLogItem struct {
 	Line                  int64          `json:"line"`
+	Offset                int64          `json:"offset"`
 	Stage                 string         `json:"stage"`
 	Operation             string         `json:"operation"`
 	Attempt               int            `json:"attempt"`
@@ -50,18 +52,34 @@ type rawExchangeLogItem struct {
 	RequestBodyTruncated  bool           `json:"request_body_truncated"`
 	ResponseBodyBytes     int64          `json:"response_body_bytes"`
 	ResponseBodyTruncated bool           `json:"response_body_truncated"`
-	Raw                   map[string]any `json:"raw"`
+	Raw                   map[string]any `json:"raw,omitempty"`
 }
 
 func (h *OpsHandler) ListRawExchangeLogs(c *gin.Context) {
+	path := strings.TrimSpace(os.Getenv("RAW_EXCHANGE_LOG_FILE_PATH"))
+	resolvedPath := middleware.RawExchangeLogFilePath(path)
+	if value := strings.TrimSpace(c.Query("offset")); value != "" {
+		offset, err := strconv.ParseInt(value, 10, 64)
+		if err != nil || offset < 0 {
+			response.BadRequest(c, "invalid offset")
+			return
+		}
+		item, err := readRawExchangeLogRecordAt(resolvedPath, offset)
+		if err != nil {
+			response.Error(c, http.StatusBadRequest, err.Error())
+			return
+		}
+		response.Success(c, item)
+		return
+	}
+
 	filter, err := parseRawExchangeLogFilter(c)
 	if err != nil {
 		response.BadRequest(c, err.Error())
 		return
 	}
 
-	path := strings.TrimSpace(os.Getenv("RAW_EXCHANGE_LOG_FILE_PATH"))
-	items, total, err := readRawExchangeLogRecords(middleware.RawExchangeLogFilePath(path), filter)
+	items, total, err := readRawExchangeLogRecords(resolvedPath, filter)
 	if err != nil {
 		response.Error(c, http.StatusInternalServerError, err.Error())
 		return
@@ -70,7 +88,7 @@ func (h *OpsHandler) ListRawExchangeLogs(c *gin.Context) {
 	response.Success(c, gin.H{
 		"items": items,
 		"total": total,
-		"path":  middleware.RawExchangeLogFilePath(path),
+		"path":  resolvedPath,
 	})
 }
 
@@ -111,53 +129,102 @@ func readRawExchangeLogRecords(path string, filter rawExchangeLogFilter) ([]rawE
 		filter.Limit = 200
 	}
 
+	items := make([]rawExchangeLogItem, 0, filter.Limit)
+	err := walkRawExchangeLinesReverse(path, func(offset int64, line []byte) bool {
+		trimmed := strings.TrimSpace(string(line))
+		if trimmed == "" || !rawExchangeLineMatches(trimmed, filter) {
+			return true
+		}
+		var raw map[string]any
+		if json.Unmarshal([]byte(trimmed), &raw) != nil || !rawExchangeRawMatchesClaude(raw) {
+			return true
+		}
+		item := rawExchangeLogItemFromRaw(0, raw)
+		item.Offset = offset
+		item.Raw = nil
+		items = append(items, item)
+		return len(items) < filter.Limit
+	})
+	if os.IsNotExist(err) {
+		return []rawExchangeLogItem{}, 0, nil
+	}
+	return items, len(items), err
+}
+
+func walkRawExchangeLinesReverse(path string, visit func(offset int64, line []byte) bool) error {
 	file, err := os.Open(path)
 	if err != nil {
-		if os.IsNotExist(err) {
-			return []rawExchangeLogItem{}, 0, nil
-		}
-		return nil, 0, err
+		return err
 	}
 	defer func() { _ = file.Close() }()
-
-	reader := bufio.NewReader(file)
-	items := make([]rawExchangeLogItem, 0, filter.Limit)
-	total := 0
-	var lineNo int64
-	for {
-		line, readErr := reader.ReadString('\n')
-		if line != "" {
-			lineNo++
-			trimmed := strings.TrimSpace(line)
-			if trimmed != "" && rawExchangeLineMatches(trimmed, filter) {
-				var raw map[string]any
-				if err := json.Unmarshal([]byte(trimmed), &raw); err != nil {
-					return nil, 0, err
-				}
-				if !rawExchangeRawMatchesClaude(raw) {
-					continue
-				}
-				total++
-				item := rawExchangeLogItemFromRaw(lineNo, raw)
-				items = append(items, item)
-				if len(items) > filter.Limit {
-					copy(items, items[1:])
-					items = items[:filter.Limit]
-				}
+	info, err := file.Stat()
+	if err != nil {
+		return err
+	}
+	const blockSize int64 = 256 * 1024
+	position := info.Size()
+	var remainder []byte
+	for position > 0 {
+		start := position - blockSize
+		if start < 0 {
+			start = 0
+		}
+		chunk := make([]byte, position-start)
+		if _, err := file.ReadAt(chunk, start); err != nil && !errors.Is(err, io.EOF) {
+			return err
+		}
+		data := append(chunk, remainder...)
+		parts := bytes.Split(data, []byte{'\n'})
+		offsets := make([]int64, len(parts))
+		cursor := start
+		for i, part := range parts {
+			offsets[i] = cursor
+			cursor += int64(len(part)) + 1
+		}
+		for i := len(parts) - 1; i >= 1; i-- {
+			if len(parts[i]) > 0 && !visit(offsets[i], parts[i]) {
+				return nil
 			}
 		}
-		if readErr != nil {
-			if errors.Is(readErr, io.EOF) {
-				break
-			}
-			return nil, 0, readErr
+		remainder = append(remainder[:0], parts[0]...)
+		position = start
+	}
+	if len(remainder) > 0 {
+		visit(0, remainder)
+	}
+	return nil
+}
+
+func readRawExchangeLogRecordAt(path string, offset int64) (rawExchangeLogItem, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return rawExchangeLogItem{}, err
+	}
+	defer func() { _ = file.Close() }()
+	info, err := file.Stat()
+	if err != nil || offset < 0 || offset >= info.Size() {
+		return rawExchangeLogItem{}, errors.New("invalid log offset")
+	}
+	if offset > 0 {
+		previous := []byte{0}
+		if _, err := file.ReadAt(previous, offset-1); err != nil || previous[0] != '\n' {
+			return rawExchangeLogItem{}, errors.New("offset is not a log line boundary")
 		}
 	}
-
-	for i, j := 0, len(items)-1; i < j; i, j = i+1, j-1 {
-		items[i], items[j] = items[j], items[i]
+	if _, err := file.Seek(offset, io.SeekStart); err != nil {
+		return rawExchangeLogItem{}, err
 	}
-	return items, total, nil
+	line, err := bufio.NewReader(file).ReadBytes('\n')
+	if err != nil && !errors.Is(err, io.EOF) {
+		return rawExchangeLogItem{}, err
+	}
+	var raw map[string]any
+	if err := json.Unmarshal(bytes.TrimSpace(line), &raw); err != nil {
+		return rawExchangeLogItem{}, err
+	}
+	item := rawExchangeLogItemFromRaw(0, raw)
+	item.Offset = offset
+	return item, nil
 }
 
 func rawExchangeLineMatches(line string, filter rawExchangeLogFilter) bool {

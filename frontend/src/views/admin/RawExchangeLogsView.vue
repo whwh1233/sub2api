@@ -94,7 +94,7 @@
               type="button"
               class="block w-full px-4 py-3 text-left transition-colors hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:hover:bg-dark-800"
               :class="selectedRequestID === group.id ? 'bg-primary-50 dark:bg-primary-900/20' : ''"
-              @click="selectedRequestID = group.id"
+              @click="selectRequest(group.id)"
             >
               <div class="flex flex-wrap items-center gap-2">
                 <span class="rounded px-2 py-0.5 text-xs font-semibold" :class="statusClass(group.client?.status_code || group.latest.status_code)">
@@ -141,7 +141,11 @@
             </div>
           </div>
 
-          <div v-if="!selectedGroup" class="p-8 text-center text-sm text-gray-500 dark:text-gray-400">
+          <div v-if="detailLoading" class="p-8 text-center text-sm text-gray-500 dark:text-gray-400">
+            正在读取所选请求的完整原文...
+          </div>
+
+          <div v-else-if="!selectedGroup" class="p-8 text-center text-sm text-gray-500 dark:text-gray-400">
             选择左侧请求查看完整原文。
           </div>
 
@@ -220,6 +224,7 @@ const selectedRequestID = ref('')
 const total = ref(0)
 const logPath = ref('')
 const loading = ref(false)
+const detailLoading = ref(false)
 const errorMessage = ref('')
 
 interface RequestGroup {
@@ -250,7 +255,7 @@ const requestGroups = computed<RequestGroup[]>(() => {
 })
 
 const selectedGroup = computed(() => requestGroups.value.find((group) => group.id === selectedRequestID.value) ?? null)
-const selectedRawJSON = computed(() => JSON.stringify(selectedGroup.value?.records.map((item) => item.raw) ?? [], null, 2))
+const selectedRawJSON = computed(() => JSON.stringify(selectedGroup.value?.records.map((item) => item.raw || {}) ?? [], null, 2))
 const selectedSummary = computed(() => {
   const group = selectedGroup.value
   if (!group) return []
@@ -293,7 +298,9 @@ async function loadLogs(): Promise<void> {
     logPath.value = response.path || ''
 
     if (!requestGroups.value.some((group) => group.id === selectedRequestID.value)) {
-      selectedRequestID.value = requestGroups.value[0]?.id ?? ''
+      const firstID = requestGroups.value[0]?.id ?? ''
+      selectedRequestID.value = firstID
+      if (firstID) await loadRequestDetails(firstID)
     }
   } catch (error) {
     const message = (error as { message?: string })?.message || '读取原文日志失败'
@@ -312,6 +319,31 @@ function clearFilters(): void {
   filters.method = ''
   filters.status_code = ''
   void loadLogs()
+}
+
+function selectRequest(requestID: string): void {
+  selectedRequestID.value = requestID
+  void loadRequestDetails(requestID)
+}
+
+async function loadRequestDetails(requestID: string): Promise<void> {
+  const group = requestGroups.value.find((item) => item.id === requestID)
+  if (!group) return
+  const missing = group.records.filter((item) => !item.raw)
+  if (!missing.length) return
+  detailLoading.value = true
+  try {
+    const details = await Promise.all(missing.map((item) => opsAPI.getRawExchangeLog(item.offset)))
+    for (const detail of details) {
+      const summary = logs.value.find((item) => item.offset === detail.offset)
+      if (summary) Object.assign(summary, detail)
+    }
+  } catch (error) {
+    const message = (error as { message?: string })?.message || '读取完整原文失败'
+    appStore.showError(message)
+  } finally {
+    detailLoading.value = false
+  }
 }
 
 function statusClass(statusCode: number): string {

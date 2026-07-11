@@ -888,6 +888,7 @@ export interface OpsSystemLogSinkHealth {
 
 export interface RawExchangeLogItem {
   line: number
+  offset: number
   stage: 'client_exchange' | 'upstream_exchange' | string
   operation: string
   attempt: number
@@ -912,7 +913,7 @@ export interface RawExchangeLogItem {
   request_body_truncated: boolean
   response_body_bytes: number
   response_body_truncated: boolean
-  raw: Record<string, any>
+  raw?: Record<string, any>
 }
 
 export interface RawExchangeLogQuery {
@@ -1338,6 +1339,11 @@ export async function listRawExchangeLogs(params: RawExchangeLogQuery): Promise<
   return data
 }
 
+export async function getRawExchangeLog(offset: number): Promise<RawExchangeLogItem> {
+  const { data } = await apiClient.get<RawExchangeLogItem>('/admin/ops/raw-exchange-logs', { params: { offset } })
+  return data
+}
+
 // Advanced settings (DB-backed)
 export async function getAdvancedSettings(): Promise<OpsAdvancedSettings> {
   const { data } = await apiClient.get<OpsAdvancedSettings>('/admin/ops/advanced-settings')
@@ -1411,7 +1417,8 @@ export const opsAPI = {
   listSystemLogs,
   cleanupSystemLogs,
   getSystemLogSinkHealth,
-  listRawExchangeLogs
+  listRawExchangeLogs,
+  getRawExchangeLog
 }
 
 export default opsAPI
