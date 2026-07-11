@@ -1258,6 +1258,9 @@ func (a *Account) GetGrokBaseURL() string {
 	if baseURL != "" {
 		return baseURL
 	}
+	if a.Type == AccountTypeOAuth {
+		return xai.DefaultCLIBaseURL
+	}
 	return xai.DefaultBaseURL
 }
 

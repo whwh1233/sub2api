@@ -41,6 +41,19 @@ func TestGrokOAuthServiceRefreshTokenPreservesOriginalRefreshTokenWhenNotRotated
 	require.Equal(t, "client-id", info.ClientID)
 }
 
+func TestGrokOAuthServiceBuildAccountCredentialsUsesCLIInferenceProxy(t *testing.T) {
+	svc := NewGrokOAuthService(nil, &grokOAuthClientStub{})
+	defer svc.Stop()
+
+	credentials := svc.BuildAccountCredentials(&GrokTokenInfo{
+		AccessToken:  "access-token",
+		RefreshToken: "refresh-token",
+		ExpiresAt:    2_000_000_000,
+	})
+
+	require.Equal(t, xai.DefaultCLIBaseURL, credentials["base_url"])
+}
+
 func TestGrokOAuthServiceExchangeCodeRequiresStateForCallbackURLAndConsumesSession(t *testing.T) {
 	client := &grokOAuthClientStub{}
 	svc := NewGrokOAuthService(nil, client)

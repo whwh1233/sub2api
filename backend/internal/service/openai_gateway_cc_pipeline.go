@@ -14,8 +14,10 @@ import (
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/apicompat"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/xai"
 	"github.com/Wei-Shaw/sub2api/internal/util/responseheaders"
 	"github.com/gin-gonic/gin"
+	"github.com/tidwall/gjson"
 	"go.uber.org/zap"
 )
 
@@ -186,6 +188,9 @@ func (s *OpenAIGatewayService) sendCCUpstreamRequest(
 	}
 	if userAgent != "" {
 		upstreamReq.Header.Set("user-agent", userAgent)
+	}
+	if account.Platform == PlatformGrok && account.Type == AccountTypeOAuth {
+		xai.ApplyGrokCLIHeaders(upstreamReq.Header, gjson.GetBytes(body, "model").String())
 	}
 
 	// 账号级请求头覆写（仅 openai api_key 账号启用时生效）

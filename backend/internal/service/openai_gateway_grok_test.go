@@ -179,6 +179,9 @@ func TestBuildGrokResponsesRequestUsesAccountBaseURLAndBearerToken(t *testing.T)
 	require.Equal(t, "Bearer access-token", req.Header.Get("Authorization"))
 	require.Equal(t, "application/json", req.Header.Get("Content-Type"))
 	require.Contains(t, req.Header.Get("Accept"), "text/event-stream")
+	require.Contains(t, req.Header.Get("User-Agent"), "grok-pager/"+xai.GrokCLIClientVersion)
+	require.Equal(t, xai.GrokCLIClientVersion, req.Header.Get("x-grok-client-version"))
+	require.Equal(t, "grok-4.3", req.Header.Get("x-grok-model-override"))
 
 	data, err := io.ReadAll(req.Body)
 	require.NoError(t, err)
@@ -332,6 +335,41 @@ func TestForwardGrokMediaImagesGenerationNormalizesImagineAlias(t *testing.T) {
 	require.Equal(t, "grok-imagine-image-quality", result.BillingModel)
 	require.Equal(t, 1, result.ImageCount)
 	require.Equal(t, ImageBillingSize2K, result.ImageSize)
+}
+
+func TestForwardGrokMediaOAuthUsesCLIEndpointAndVersionHeaders(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	body := []byte(`{"model":"grok-imagine","prompt":"draw a cat"}`)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/images/generations", bytes.NewReader(body))
+
+	account := &Account{
+		ID: 62, Platform: PlatformGrok, Type: AccountTypeOAuth, Concurrency: 1,
+		Credentials: map[string]any{
+			"access_token": "access-token",
+			"expires_at":   time.Now().Add(time.Hour).UTC().Format(time.RFC3339),
+		},
+	}
+	repo := &grokQuotaAccountRepo{mockAccountRepoForPlatform: &mockAccountRepoForPlatform{
+		accountsByID: map[int64]*Account{62: account},
+	}}
+	upstream := &httpUpstreamRecorder{resp: &http.Response{
+		StatusCode: http.StatusOK,
+		Header:     http.Header{"Content-Type": []string{"application/json"}},
+		Body:       io.NopCloser(strings.NewReader(`{"data":[]}`)),
+	}}
+	svc := &OpenAIGatewayService{
+		httpUpstream:      upstream,
+		grokTokenProvider: NewGrokTokenProvider(repo, nil),
+	}
+
+	_, err := svc.ForwardGrokMedia(context.Background(), c, account, GrokMediaEndpointImagesGenerations, "", body, "application/json")
+	require.NoError(t, err)
+	require.Equal(t, xai.DefaultCLIBaseURL+"/images/generations", upstream.lastReq.URL.String())
+	require.Contains(t, upstream.lastReq.Header.Get("User-Agent"), "grok-pager/"+xai.GrokCLIClientVersion)
+	require.Equal(t, xai.GrokCLIClientVersion, upstream.lastReq.Header.Get("x-grok-client-version"))
+	require.Equal(t, "grok-imagine-image-quality", upstream.lastReq.Header.Get("x-grok-model-override"))
 }
 
 func TestForwardGrokMediaImagesGenerationStripsUnsupportedSize(t *testing.T) {
@@ -790,7 +828,9 @@ func TestForwardAsChatCompletionsForGrokStreamingUsesRawXAIChatCompletions(t *te
 	require.Equal(t, xai.DefaultCLIBaseURL+"/chat/completions", upstream.lastReq.URL.String())
 	require.Equal(t, "Bearer access-token", upstream.lastReq.Header.Get("Authorization"))
 	require.Equal(t, "text/event-stream", upstream.lastReq.Header.Get("Accept"))
-	require.Equal(t, "sub2api-grok/1.0", upstream.lastReq.Header.Get("User-Agent"))
+	require.Contains(t, upstream.lastReq.Header.Get("User-Agent"), "grok-pager/"+xai.GrokCLIClientVersion)
+	require.Equal(t, xai.GrokCLIClientVersion, upstream.lastReq.Header.Get("x-grok-client-version"))
+	require.Equal(t, "grok-4.5", upstream.lastReq.Header.Get("x-grok-model-override"))
 	require.Equal(t, "grok-4.5", gjson.GetBytes(upstream.lastBody, "model").String())
 	require.True(t, gjson.GetBytes(upstream.lastBody, "stream_options.include_usage").Bool())
 	require.True(t, result.Stream)
@@ -907,7 +947,9 @@ func TestForwardAsAnthropicForGrokUsesXAIResponses(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, xai.DefaultCLIBaseURL+"/responses", upstream.lastReq.URL.String())
 	require.Equal(t, "Bearer access-token", upstream.lastReq.Header.Get("Authorization"))
-	require.Equal(t, "sub2api-grok/1.0", upstream.lastReq.Header.Get("User-Agent"))
+	require.Contains(t, upstream.lastReq.Header.Get("User-Agent"), "grok-pager/"+xai.GrokCLIClientVersion)
+	require.Equal(t, xai.GrokCLIClientVersion, upstream.lastReq.Header.Get("x-grok-client-version"))
+	require.Equal(t, "grok-4.5", upstream.lastReq.Header.Get("x-grok-model-override"))
 	require.Equal(t, "grok-4.5", gjson.GetBytes(upstream.lastBody, "model").String())
 	require.True(t, gjson.GetBytes(upstream.lastBody, "stream").Bool())
 	require.NotContains(t, string(upstream.lastBody), "chatgpt.com")

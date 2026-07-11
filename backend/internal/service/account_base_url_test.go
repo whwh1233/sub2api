@@ -4,6 +4,8 @@ package service
 
 import (
 	"testing"
+
+	"github.com/Wei-Shaw/sub2api/internal/pkg/xai"
 )
 
 func TestGetBaseURL(t *testing.T) {
@@ -72,6 +74,40 @@ func TestGetBaseURL(t *testing.T) {
 			result := tt.account.GetBaseURL()
 			if result != tt.expected {
 				t.Errorf("GetBaseURL() = %q, want %q", result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestGetGrokBaseURLDefaultsByAccountType(t *testing.T) {
+	tests := []struct {
+		name     string
+		account  Account
+		expected string
+	}{
+		{
+			name:     "oauth defaults to CLI inference proxy",
+			account:  Account{Type: AccountTypeOAuth, Platform: PlatformGrok},
+			expected: xai.DefaultCLIBaseURL,
+		},
+		{
+			name:     "api key keeps public API default",
+			account:  Account{Type: AccountTypeAPIKey, Platform: PlatformGrok},
+			expected: xai.DefaultBaseURL,
+		},
+		{
+			name: "explicit base URL wins",
+			account: Account{Type: AccountTypeOAuth, Platform: PlatformGrok, Credentials: map[string]any{
+				"base_url": "https://custom.example/v1",
+			}},
+			expected: "https://custom.example/v1",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.account.GetGrokBaseURL(); got != tt.expected {
+				t.Fatalf("GetGrokBaseURL() = %q, want %q", got, tt.expected)
 			}
 		})
 	}
