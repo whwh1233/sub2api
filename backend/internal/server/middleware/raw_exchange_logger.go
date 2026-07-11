@@ -2,16 +2,12 @@ package middleware
 
 import (
 	"bytes"
-	"encoding/base64"
-	"encoding/json"
 	"io"
 	"net/http"
-	"os"
-	"path/filepath"
 	"strings"
-	"sync"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/audit/rawexchange"
 	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/ctxkey"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/ip"
@@ -19,8 +15,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 )
-
-var rawExchangeFileMu sync.Mutex
 
 // RawExchangeLogger captures raw request and response data for debugging
 // deployments. It intentionally does not redact anything.
@@ -46,7 +40,7 @@ func RawExchangeLogger(cfg config.RawExchangeLogConfig) gin.HandlerFunc {
 		startTime := time.Now()
 		requestBody, requestReadErr := readAndRestoreRequestBody(c.Request)
 
-		responseBody := newCaptureBuffer(cfg.MaxBodyBytes)
+		responseBody := newCaptureBuffer(0)
 		originalWriter := c.Writer
 		c.Writer = &rawExchangeResponseWriter{
 			ResponseWriter: originalWriter,
@@ -63,43 +57,41 @@ func RawExchangeLogger(cfg config.RawExchangeLogConfig) gin.HandlerFunc {
 		platform, _ := ctx.Value(ctxkey.Platform).(string)
 		model, _ := ctx.Value(ctxkey.Model).(string)
 		forcePlatform, _ := ctx.Value(ctxkey.ForcePlatform).(string)
+		userID, hasUserID := ctx.Value(ctxkey.UserID).(int64)
 
 		if !isClaudeRawExchange(c, platform, forcePlatform, model, requestBody) {
 			return
 		}
 
-		capturedRequest := captureBytes(requestBody, cfg.MaxBodyBytes)
 		record := map[string]any{
-			"component":               "http.raw_exchange",
-			"request_id":              strings.TrimSpace(requestID),
-			"client_request_id":       strings.TrimSpace(clientRequestID),
-			"method":                  c.Request.Method,
-			"path":                    c.Request.URL.Path,
-			"request_uri":             c.Request.RequestURI,
-			"raw_query":               c.Request.URL.RawQuery,
-			"query":                   cloneValues(c.Request.URL.Query()),
-			"path_params":             cloneParams(c.Params),
-			"request_headers":         cloneHeader(c.Request.Header),
-			"request_body":            capturedRequest.value,
-			"request_body_base64":     base64.StdEncoding.EncodeToString(capturedRequest.bytes),
-			"request_body_bytes":      int64(len(requestBody)),
-			"request_body_truncated":  capturedRequest.truncated,
-			"status_code":             c.Writer.Status(),
-			"response_headers":        cloneHeader(c.Writer.Header()),
-			"response_body":           responseBody.String(),
-			"response_body_base64":    base64.StdEncoding.EncodeToString(responseBody.Bytes()),
-			"response_body_bytes":     responseBody.TotalBytes(),
-			"response_body_truncated": responseBody.Truncated(),
-			"latency_ms":              endTime.Sub(startTime).Milliseconds(),
-			"client_ip":               ip.GetClientIP(c),
-			"protocol":                c.Request.Proto,
-			"completed_at":            endTime.Format(time.RFC3339Nano),
+			"component":         "claude.raw_exchange",
+			"stage":             "client_exchange",
+			"request_id":        strings.TrimSpace(requestID),
+			"client_request_id": strings.TrimSpace(clientRequestID),
+			"method":            c.Request.Method,
+			"path":              c.Request.URL.Path,
+			"request_uri":       c.Request.RequestURI,
+			"raw_query":         c.Request.URL.RawQuery,
+			"query":             cloneValues(c.Request.URL.Query()),
+			"path_params":       cloneParams(c.Params),
+			"request_headers":   cloneHeader(c.Request.Header),
+			"status_code":       c.Writer.Status(),
+			"response_headers":  cloneHeader(c.Writer.Header()),
+			"latency_ms":        endTime.Sub(startTime).Milliseconds(),
+			"client_ip":         ip.GetClientIP(c),
+			"protocol":          c.Request.Proto,
+			"completed_at":      endTime.Format(time.RFC3339Nano),
 		}
+		rawexchange.AddBody(record, "request_body", requestBody)
+		rawexchange.AddBody(record, "response_body", responseBody.Bytes())
 		if requestReadErr != nil {
 			record["request_body_read_error"] = requestReadErr.Error()
 		}
 		if hasAccountID && accountID > 0 {
 			record["account_id"] = accountID
+		}
+		if hasUserID && userID > 0 {
+			record["user_id"] = userID
 		}
 		if platform != "" {
 			record["platform"] = platform
@@ -301,38 +293,9 @@ func rawExchangeZapFields(record map[string]any) []zap.Field {
 // exchange viewer. Empty config resolves under DATA_DIR so systemd deployments
 // keep the file with the rest of the app data.
 func RawExchangeLogFilePath(configured string) string {
-	configured = strings.TrimSpace(configured)
-	if configured != "" {
-		return configured
-	}
-	dataDir := strings.TrimSpace(os.Getenv("DATA_DIR"))
-	if dataDir == "" {
-		dataDir = "."
-	}
-	return filepath.Join(dataDir, "raw-exchange", "raw-exchange.jsonl")
+	return rawexchange.FilePath(configured)
 }
 
 func appendRawExchangeJSONL(configuredPath string, record map[string]any) error {
-	path := RawExchangeLogFilePath(configuredPath)
-	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
-		return err
-	}
-
-	var buf bytes.Buffer
-	encoder := json.NewEncoder(&buf)
-	encoder.SetEscapeHTML(false)
-	if err := encoder.Encode(record); err != nil {
-		return err
-	}
-
-	rawExchangeFileMu.Lock()
-	defer rawExchangeFileMu.Unlock()
-
-	file, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0600)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = file.Close() }()
-	_, err = file.Write(buf.Bytes())
-	return err
+	return rawexchange.Append(configuredPath, record)
 }

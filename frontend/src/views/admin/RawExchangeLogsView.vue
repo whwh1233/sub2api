@@ -69,60 +69,61 @@
         {{ errorMessage }}
       </div>
 
-      <div class="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,560px)_minmax(0,1fr)]">
+      <div class="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(360px,440px)_minmax(0,1fr)]">
         <section class="card min-w-0 overflow-hidden">
           <div class="border-b border-gray-100 p-4 dark:border-dark-800">
             <div class="flex flex-wrap items-center justify-between gap-2">
               <h2 class="text-base font-semibold text-gray-900 dark:text-white">请求列表</h2>
-              <span class="text-xs text-gray-500 dark:text-gray-400">共 {{ total }} 条</span>
+              <span class="text-xs text-gray-500 dark:text-gray-400">{{ requestGroups.length }} 个请求 / {{ total }} 条记录</span>
             </div>
             <p class="mt-1 truncate text-xs text-gray-500 dark:text-gray-400" :title="logPath">
               {{ logPath || '尚未返回日志文件路径' }}
             </p>
           </div>
 
-          <div v-if="loading && !logs.length" class="p-8 text-center text-sm text-gray-500 dark:text-gray-400">
+          <div v-if="loading && !requestGroups.length" class="p-8 text-center text-sm text-gray-500 dark:text-gray-400">
             正在读取原文日志...
           </div>
-          <div v-else-if="!logs.length" class="p-8 text-center text-sm text-gray-500 dark:text-gray-400">
+          <div v-else-if="!requestGroups.length" class="p-8 text-center text-sm text-gray-500 dark:text-gray-400">
             暂无匹配记录。发起一次接口请求后再刷新。
           </div>
           <div v-else class="max-h-[720px] divide-y divide-gray-100 overflow-y-auto dark:divide-dark-800">
             <button
-              v-for="item in logs"
-              :key="item.line"
+              v-for="group in requestGroups"
+              :key="group.id"
               type="button"
               class="block w-full px-4 py-3 text-left transition-colors hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:hover:bg-dark-800"
-              :class="selectedLine === item.line ? 'bg-primary-50 dark:bg-primary-900/20' : ''"
-              @click="selectedLine = item.line"
+              :class="selectedRequestID === group.id ? 'bg-primary-50 dark:bg-primary-900/20' : ''"
+              @click="selectedRequestID = group.id"
             >
               <div class="flex flex-wrap items-center gap-2">
-                <span class="rounded px-2 py-0.5 text-xs font-semibold" :class="statusClass(item.status_code)">
-                  {{ item.status_code || '-' }}
+                <span class="rounded px-2 py-0.5 text-xs font-semibold" :class="statusClass(group.client?.status_code || group.latest.status_code)">
+                  {{ group.client?.status_code || group.latest.status_code || '-' }}
                 </span>
-                <span class="font-mono text-xs font-semibold text-gray-700 dark:text-gray-200">{{ item.method || '-' }}</span>
-                <span class="min-w-0 flex-1 truncate font-mono text-xs text-gray-900 dark:text-white" :title="item.request_uri || item.path">
-                  {{ item.request_uri || item.path || '-' }}
+                <span class="font-mono text-xs font-semibold text-gray-700 dark:text-gray-200">{{ group.client?.method || group.latest.method || '-' }}</span>
+                <span class="min-w-0 flex-1 truncate font-mono text-xs text-gray-900 dark:text-white" :title="group.client?.request_uri || group.latest.url || group.latest.path">
+                  {{ group.client?.request_uri || group.latest.path || '-' }}
                 </span>
               </div>
               <div class="mt-2 grid grid-cols-2 gap-2 text-xs text-gray-500 dark:text-gray-400">
                 <div class="truncate">
-                  <span class="text-gray-400">time</span>
-                  {{ formatDate(item.completed_at) }}
+                  <span class="text-gray-400">时间</span>
+                  {{ formatDate(group.latest.completed_at) }}
                 </div>
                 <div class="truncate">
-                  <span class="text-gray-400">latency</span>
-                  {{ formatDuration(item.latency_ms) }}
+                  <span class="text-gray-400">用户</span>
+                  <span class="font-mono">{{ group.client?.user_id || group.latest.user_id || '-' }}</span>
                 </div>
                 <div class="truncate">
-                  <span class="text-gray-400">rid</span>
-                  <span class="font-mono">{{ item.request_id || '-' }}</span>
+                  <span class="text-gray-400">IP</span>
+                  <span class="font-mono">{{ group.client?.client_ip || '-' }}</span>
                 </div>
                 <div class="truncate">
-                  <span class="text-gray-400">body</span>
-                  {{ formatBytes(item.request_body_bytes) }} / {{ formatBytes(item.response_body_bytes) }}
+                  <span class="text-gray-400">上游</span>
+                  {{ group.upstream.length }} 次
                 </div>
               </div>
+              <div class="mt-2 truncate font-mono text-[11px] text-gray-400" :title="group.id">{{ group.id }}</div>
             </button>
           </div>
         </section>
@@ -130,71 +131,66 @@
         <section class="card min-w-0 overflow-hidden">
           <div class="border-b border-gray-100 p-4 dark:border-dark-800">
             <div class="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <h2 class="text-base font-semibold text-gray-900 dark:text-white">完整原文详情</h2>
-                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">raw JSON 保留所有已捕获字段，不做脱敏。</p>
+              <div class="min-w-0">
+                <h2 class="text-base font-semibold text-gray-900 dark:text-white">Claude 请求链路原文</h2>
+                <p class="mt-1 truncate font-mono text-xs text-gray-500 dark:text-gray-400" :title="selectedGroup?.id">{{ selectedGroup?.id || '选择左侧请求' }}</p>
               </div>
-              <div v-if="selectedLog" class="flex flex-wrap gap-2">
-                <button type="button" class="btn btn-secondary btn-sm" @click="copySelectedRaw">复制 JSON</button>
-                <button type="button" class="btn btn-secondary btn-sm" @click="copySelectedBodies">复制 Body</button>
+              <div v-if="selectedGroup" class="flex flex-wrap gap-2">
+                <button type="button" class="btn btn-secondary btn-sm" @click="copySelectedRaw">复制完整链路</button>
               </div>
             </div>
           </div>
 
-          <div v-if="!selectedLog" class="p-8 text-center text-sm text-gray-500 dark:text-gray-400">
+          <div v-if="!selectedGroup" class="p-8 text-center text-sm text-gray-500 dark:text-gray-400">
             选择左侧请求查看完整原文。
           </div>
 
-          <div v-else class="space-y-4 p-4">
-            <div class="grid grid-cols-2 gap-3 text-xs lg:grid-cols-4">
-              <div class="rounded-md bg-gray-50 p-3 dark:bg-dark-800">
-                <div class="text-gray-500 dark:text-gray-400">Request ID</div>
-                <div class="mt-1 truncate font-mono text-gray-900 dark:text-white" :title="selectedLog.request_id">{{ selectedLog.request_id || '-' }}</div>
-              </div>
-              <div class="rounded-md bg-gray-50 p-3 dark:bg-dark-800">
-                <div class="text-gray-500 dark:text-gray-400">Client IP</div>
-                <div class="mt-1 truncate font-mono text-gray-900 dark:text-white">{{ selectedLog.client_ip || '-' }}</div>
-              </div>
-              <div class="rounded-md bg-gray-50 p-3 dark:bg-dark-800">
-                <div class="text-gray-500 dark:text-gray-400">Platform / Model</div>
-                <div class="mt-1 truncate font-mono text-gray-900 dark:text-white">{{ selectedLog.platform || '-' }} / {{ selectedLog.model || '-' }}</div>
-              </div>
-              <div class="rounded-md bg-gray-50 p-3 dark:bg-dark-800">
-                <div class="text-gray-500 dark:text-gray-400">Line</div>
-                <div class="mt-1 truncate font-mono text-gray-900 dark:text-white">{{ selectedLog.line }}</div>
+          <div v-else class="space-y-5 p-4">
+            <div class="grid grid-cols-2 gap-3 text-xs lg:grid-cols-5">
+              <div v-for="summary in selectedSummary" :key="summary.label" class="rounded-md bg-gray-50 p-3 dark:bg-dark-800">
+                <div class="text-gray-500 dark:text-gray-400">{{ summary.label }}</div>
+                <div class="mt-1 break-all font-mono text-gray-900 dark:text-white">{{ summary.value }}</div>
               </div>
             </div>
 
-            <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
-              <div class="min-w-0">
-                <div class="mb-2 flex items-center justify-between gap-2">
-                  <h3 class="text-sm font-semibold text-gray-900 dark:text-white">请求 Body 预览</h3>
-                  <span class="text-xs text-gray-500 dark:text-gray-400">
-                    {{ formatBytes(selectedLog.request_body_bytes) }}
-                    <span v-if="selectedLog.request_body_truncated"> / truncated</span>
-                  </span>
-                </div>
-                <pre class="max-h-[300px] overflow-auto rounded-lg bg-gray-950 p-3 text-xs leading-relaxed text-gray-100">{{ requestBodyPreview }}</pre>
+            <section v-if="selectedGroup.client" class="space-y-2">
+              <div class="flex items-center justify-between gap-3">
+                <h3 class="text-sm font-semibold text-gray-900 dark:text-white">1. 客户端 → sub2api 请求</h3>
+                <span class="text-xs text-gray-500 dark:text-gray-400">{{ formatBytes(selectedGroup.client.request_body_bytes) }}</span>
               </div>
-              <div class="min-w-0">
-                <div class="mb-2 flex items-center justify-between gap-2">
-                  <h3 class="text-sm font-semibold text-gray-900 dark:text-white">响应 Body 预览</h3>
-                  <span class="text-xs text-gray-500 dark:text-gray-400">
-                    {{ formatBytes(selectedLog.response_body_bytes) }}
-                    <span v-if="selectedLog.response_body_truncated"> / truncated</span>
-                  </span>
-                </div>
-                <pre class="max-h-[300px] overflow-auto rounded-lg bg-gray-950 p-3 text-xs leading-relaxed text-gray-100">{{ responseBodyPreview }}</pre>
-              </div>
-            </div>
+              <pre class="max-h-[420px] overflow-auto whitespace-pre-wrap break-all rounded-md bg-gray-950 p-4 font-mono text-xs leading-5 text-gray-100">{{ stageText(selectedGroup.client, 'request') }}</pre>
+            </section>
 
-            <div class="min-w-0">
-              <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
-                <h3 class="text-sm font-semibold text-gray-900 dark:text-white">完整 raw JSON</h3>
-                <span class="text-xs text-gray-500 dark:text-gray-400">包含 headers、query、body、base64 bytes、耗时和响应信息</span>
+            <section class="space-y-3">
+              <div class="flex items-center justify-between gap-3">
+                <h3 class="text-sm font-semibold text-gray-900 dark:text-white">2-3. sub2api ↔ Claude 上游</h3>
+                <span class="text-xs text-gray-500 dark:text-gray-400">{{ selectedGroup.upstream.length }} 次实际请求</span>
               </div>
-              <pre class="max-h-[560px] overflow-auto rounded-lg bg-gray-950 p-4 text-xs leading-relaxed text-gray-100">{{ selectedRawJSON }}</pre>
-            </div>
+              <div v-if="!selectedGroup.upstream.length" class="rounded-md border border-dashed border-gray-300 p-4 text-sm text-gray-500 dark:border-dark-700 dark:text-gray-400">尚无上游记录。</div>
+              <details v-for="attempt in selectedGroup.upstream" :key="attempt.line" class="rounded-md border border-gray-200 dark:border-dark-700" open>
+                <summary class="cursor-pointer px-4 py-3 text-sm font-medium text-gray-800 dark:text-gray-200">
+                  Attempt {{ attempt.attempt || 1 }} · {{ attempt.operation || 'messages' }} · {{ attempt.status_code || 'ERR' }} · {{ formatDuration(attempt.latency_ms) }}
+                </summary>
+                <div class="grid grid-cols-1 gap-px border-t border-gray-200 bg-gray-200 dark:border-dark-700 dark:bg-dark-700 2xl:grid-cols-2">
+                  <div class="min-w-0 bg-white p-3 dark:bg-dark-900">
+                    <div class="mb-2 text-xs font-semibold text-gray-600 dark:text-gray-300">sub2api → Claude 请求</div>
+                    <pre class="max-h-[460px] overflow-auto whitespace-pre-wrap break-all rounded-md bg-gray-950 p-3 font-mono text-xs leading-5 text-gray-100">{{ stageText(attempt, 'request') }}</pre>
+                  </div>
+                  <div class="min-w-0 bg-white p-3 dark:bg-dark-900">
+                    <div class="mb-2 text-xs font-semibold text-gray-600 dark:text-gray-300">Claude → sub2api 响应</div>
+                    <pre class="max-h-[460px] overflow-auto whitespace-pre-wrap break-all rounded-md bg-gray-950 p-3 font-mono text-xs leading-5 text-gray-100">{{ stageText(attempt, 'response') }}</pre>
+                  </div>
+                </div>
+              </details>
+            </section>
+
+            <section v-if="selectedGroup.client" class="space-y-2">
+              <div class="flex items-center justify-between gap-3">
+                <h3 class="text-sm font-semibold text-gray-900 dark:text-white">4. sub2api → 客户端响应</h3>
+                <span class="text-xs text-gray-500 dark:text-gray-400">{{ formatBytes(selectedGroup.client.response_body_bytes) }}</span>
+              </div>
+              <pre class="max-h-[420px] overflow-auto whitespace-pre-wrap break-all rounded-md bg-gray-950 p-4 font-mono text-xs leading-5 text-gray-100">{{ stageText(selectedGroup.client, 'response') }}</pre>
+            </section>
           </div>
         </section>
       </div>
@@ -220,16 +216,53 @@ const filters = reactive({
 })
 
 const logs = ref<RawExchangeLogItem[]>([])
-const selectedLine = ref<number | null>(null)
+const selectedRequestID = ref('')
 const total = ref(0)
 const logPath = ref('')
 const loading = ref(false)
 const errorMessage = ref('')
 
-const selectedLog = computed(() => logs.value.find((item) => item.line === selectedLine.value) ?? null)
-const selectedRawJSON = computed(() => (selectedLog.value ? JSON.stringify(selectedLog.value.raw, null, 2) : ''))
-const requestBodyPreview = computed(() => bodyPreview(selectedLog.value, 'request_body', 'request_body_base64'))
-const responseBodyPreview = computed(() => bodyPreview(selectedLog.value, 'response_body', 'response_body_base64'))
+interface RequestGroup {
+  id: string
+  latest: RawExchangeLogItem
+  client: RawExchangeLogItem | null
+  upstream: RawExchangeLogItem[]
+  records: RawExchangeLogItem[]
+}
+
+const requestGroups = computed<RequestGroup[]>(() => {
+  const grouped = new Map<string, RequestGroup>()
+  for (const item of logs.value) {
+    const id = item.request_id || item.client_request_id || `line-${item.line}`
+    let group = grouped.get(id)
+    if (!group) {
+      group = { id, latest: item, client: null, upstream: [], records: [] }
+      grouped.set(id, group)
+    }
+    group.records.push(item)
+    if (item.stage === 'client_exchange' || (!item.stage && !group.client)) group.client = item
+    if (item.stage === 'upstream_exchange') group.upstream.push(item)
+  }
+  for (const group of grouped.values()) {
+    group.upstream.sort((a, b) => (a.attempt || 1) - (b.attempt || 1) || a.line - b.line)
+  }
+  return [...grouped.values()]
+})
+
+const selectedGroup = computed(() => requestGroups.value.find((group) => group.id === selectedRequestID.value) ?? null)
+const selectedRawJSON = computed(() => JSON.stringify(selectedGroup.value?.records.map((item) => item.raw) ?? [], null, 2))
+const selectedSummary = computed(() => {
+  const group = selectedGroup.value
+  if (!group) return []
+  const anchor = group.client || group.latest
+  return [
+    { label: '用户 ID', value: String(anchor.user_id || '-') },
+    { label: '客户端 IP', value: anchor.client_ip || '-' },
+    { label: '模型', value: anchor.model || '-' },
+    { label: '账号 ID', value: String(group.upstream[0]?.account_id || anchor.account_id || '-') },
+    { label: '总耗时', value: formatDuration(group.client?.latency_ms ?? anchor.latency_ms) },
+  ]
+})
 
 function buildQuery(): RawExchangeLogQuery {
   const query: RawExchangeLogQuery = {
@@ -259,8 +292,8 @@ async function loadLogs(): Promise<void> {
     total.value = response.total ?? logs.value.length
     logPath.value = response.path || ''
 
-    if (!logs.value.some((item) => item.line === selectedLine.value)) {
-      selectedLine.value = logs.value[0]?.line ?? null
+    if (!requestGroups.value.some((group) => group.id === selectedRequestID.value)) {
+      selectedRequestID.value = requestGroups.value[0]?.id ?? ''
     }
   } catch (error) {
     const message = (error as { message?: string })?.message || '读取原文日志失败'
@@ -321,6 +354,31 @@ function bodyPreview(log: RawExchangeLogItem | null, bodyKey: string, base64Key:
   return ''
 }
 
+function stageText(log: RawExchangeLogItem, direction: 'request' | 'response'): string {
+  const raw = log.raw || {}
+  const bodyKey = `${direction}_body`
+  const base64Key = `${bodyKey}_base64`
+  const payload: Record<string, unknown> = direction === 'request'
+    ? {
+        method: log.method,
+        url: log.url || log.request_uri || log.path,
+        headers: raw.request_headers || {},
+        body: bodyPreview(log, bodyKey, base64Key),
+        body_base64: raw[base64Key] || '',
+        body_bytes: raw[`${bodyKey}_bytes`] || 0,
+      }
+    : {
+        status_code: log.status_code,
+        headers: raw.response_headers || {},
+        body: bodyPreview(log, bodyKey, base64Key),
+        body_base64: raw[base64Key] || '',
+        body_bytes: raw[`${bodyKey}_bytes`] || 0,
+        transport_error: raw.transport_error || '',
+        read_error: raw.response_body_read_error || '',
+      }
+  return JSON.stringify(payload, null, 2)
+}
+
 function decodeBase64Text(value: unknown): string {
   if (typeof value !== 'string' || value.length === 0) return ''
   try {
@@ -333,18 +391,7 @@ function decodeBase64Text(value: unknown): string {
 }
 
 async function copySelectedRaw(): Promise<void> {
-  await copyText(selectedRawJSON.value, '已复制完整 raw JSON')
-}
-
-async function copySelectedBodies(): Promise<void> {
-  const text = [
-    '--- request_body ---',
-    requestBodyPreview.value,
-    '',
-    '--- response_body ---',
-    responseBodyPreview.value,
-  ].join('\n')
-  await copyText(text, '已复制请求和响应 Body')
+  await copyText(selectedRawJSON.value, '已复制完整请求链路')
 }
 
 async function copyText(text: string, successMessage: string): Promise<void> {

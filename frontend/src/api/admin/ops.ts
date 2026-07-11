@@ -888,12 +888,17 @@ export interface OpsSystemLogSinkHealth {
 
 export interface RawExchangeLogItem {
   line: number
+  stage: 'client_exchange' | 'upstream_exchange' | string
+  operation: string
+  attempt: number
   completed_at: string
+  started_at: string
   request_id: string
   client_request_id: string
   method: string
   path: string
   request_uri: string
+  url: string
   raw_query: string
   status_code: number
   latency_ms: number
@@ -902,6 +907,7 @@ export interface RawExchangeLogItem {
   platform: string
   model: string
   account_id: number
+  user_id: number
   request_body_bytes: number
   request_body_truncated: boolean
   response_body_bytes: number

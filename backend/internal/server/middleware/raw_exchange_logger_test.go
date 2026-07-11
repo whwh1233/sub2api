@@ -30,6 +30,7 @@ func TestRawExchangeLogger_CapturesOriginalRequestAndResponse(t *testing.T) {
 	}))
 	r.POST("/v1/chat", func(c *gin.Context) {
 		ctx := context.WithValue(c.Request.Context(), ctxkey.Platform, "anthropic")
+		ctx = context.WithValue(ctx, ctxkey.UserID, int64(77))
 		c.Request = c.Request.WithContext(ctx)
 		c.Header("X-Upstream-Token", "response-header-secret")
 		c.JSON(http.StatusAccepted, gin.H{
@@ -56,6 +57,10 @@ func TestRawExchangeLogger_CapturesOriginalRequestAndResponse(t *testing.T) {
 	assertStringField(t, event, "request_body", `"password":"request-body-secret"`)
 	assertStringField(t, event, "response_body", `"token":"response-body-secret"`)
 	assertStringField(t, event, "raw_query", "api_key=query-secret")
+	assertStringField(t, event, "stage", "client_exchange")
+	if got := event.Fields["user_id"]; got != int64(77) {
+		t.Fatalf("user_id=%v", got)
+	}
 
 	requestHeaders, ok := event.Fields["request_headers"].(map[string][]string)
 	if !ok {

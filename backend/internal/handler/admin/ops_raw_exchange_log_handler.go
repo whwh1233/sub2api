@@ -26,12 +26,17 @@ type rawExchangeLogFilter struct {
 
 type rawExchangeLogItem struct {
 	Line                  int64          `json:"line"`
+	Stage                 string         `json:"stage"`
+	Operation             string         `json:"operation"`
+	Attempt               int            `json:"attempt"`
 	CompletedAt           string         `json:"completed_at"`
+	StartedAt             string         `json:"started_at"`
 	RequestID             string         `json:"request_id"`
 	ClientRequestID       string         `json:"client_request_id"`
 	Method                string         `json:"method"`
 	Path                  string         `json:"path"`
 	RequestURI            string         `json:"request_uri"`
+	URL                   string         `json:"url"`
 	RawQuery              string         `json:"raw_query"`
 	StatusCode            int            `json:"status_code"`
 	LatencyMs             int64          `json:"latency_ms"`
@@ -40,6 +45,7 @@ type rawExchangeLogItem struct {
 	Platform              string         `json:"platform"`
 	Model                 string         `json:"model"`
 	AccountID             *int64         `json:"account_id,omitempty"`
+	UserID                *int64         `json:"user_id,omitempty"`
 	RequestBodyBytes      int64          `json:"request_body_bytes"`
 	RequestBodyTruncated  bool           `json:"request_body_truncated"`
 	ResponseBodyBytes     int64          `json:"response_body_bytes"`
@@ -225,12 +231,17 @@ func rawExchangeHeaderValueString(value any) string {
 func rawExchangeLogItemFromRaw(line int64, raw map[string]any) rawExchangeLogItem {
 	item := rawExchangeLogItem{
 		Line:                  line,
+		Stage:                 rawString(raw, "stage"),
+		Operation:             rawString(raw, "operation"),
+		Attempt:               int(rawInt64(raw, "attempt")),
 		CompletedAt:           rawString(raw, "completed_at"),
+		StartedAt:             rawString(raw, "started_at"),
 		RequestID:             rawString(raw, "request_id"),
 		ClientRequestID:       rawString(raw, "client_request_id"),
 		Method:                rawString(raw, "method"),
 		Path:                  rawString(raw, "path"),
 		RequestURI:            rawString(raw, "request_uri"),
+		URL:                   rawString(raw, "url"),
 		RawQuery:              rawString(raw, "raw_query"),
 		StatusCode:            int(rawInt64(raw, "status_code")),
 		LatencyMs:             rawInt64(raw, "latency_ms"),
@@ -246,6 +257,9 @@ func rawExchangeLogItemFromRaw(line int64, raw map[string]any) rawExchangeLogIte
 	}
 	if id := rawInt64(raw, "account_id"); id > 0 {
 		item.AccountID = &id
+	}
+	if id := rawInt64(raw, "user_id"); id > 0 {
+		item.UserID = &id
 	}
 	return item
 }
