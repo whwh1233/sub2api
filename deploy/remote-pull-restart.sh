@@ -1,6 +1,6 @@
 #!/bin/bash
 # remote-pull-restart.sh
-# VPS 端：备份当前二进制 → git pull → 重启 → 失败自动回滚
+# VPS 端：备份当前二进制 → git pull → 校验并解压 → 原子替换 → 重启
 # 用法（VPS 上作为 root）：
 #   bash /root/sub2api/deploy/remote-pull-restart.sh
 #
@@ -9,10 +9,14 @@
 
 set -euo pipefail
 
-REPO_DIR="/root/sub2api"
+REPO_DIR="${REPO_DIR:-/root/sub2api}"
 BINARY="$REPO_DIR/backend/sub2api-linux"
 BACKUP="$BINARY.prev"
-SERVICE="sub2api"
+ARTIFACT="$REPO_DIR/backend/sub2api-linux.gz"
+CHECKSUM="$REPO_DIR/backend/sub2api-linux.sha256"
+STAGED="$REPO_DIR/backend/sub2api-linux.new"
+SERVICE="${SERVICE:-sub2api}"
+REPLACED=0
 
 cd "$REPO_DIR"
 
@@ -23,11 +27,10 @@ if [ "${1:-}" = "rollback" ]; then
         exit 1
     fi
     echo "==== 回滚到上一版本 ===="
-    systemctl stop "$SERVICE"
-    rm -f "$BINARY"
-    mv "$BACKUP" "$BINARY"
-    chmod +x "$BINARY"
-    systemctl start "$SERVICE"
+    cp -a "$BACKUP" "$STAGED"
+    chmod +x "$STAGED"
+    mv -f "$STAGED" "$BINARY"
+    systemctl restart "$SERVICE"
     sleep 2
     systemctl status "$SERVICE" --no-pager | sed -n '1,10p'
     echo ""
@@ -37,18 +40,22 @@ fi
 
 # ---- 部署模式 ----
 
-# 失败时自动从 .prev 回滚
+# 失败时：替换前恢复路径但不重启；替换后从 .prev 原子回滚并重启。
 rollback_on_fail() {
     local rc=$?
     if [ $rc -ne 0 ]; then
         echo ""
-        echo "!! 部署失败，尝试从备份回滚..." >&2
+        echo "!! 部署失败，处理本地二进制状态..." >&2
         if [ -f "$BACKUP" ]; then
-            rm -f "$BINARY"
-            mv "$BACKUP" "$BINARY"
-            chmod +x "$BINARY"
-            systemctl start "$SERVICE" 2>/dev/null || true
-            echo "   已恢复为备份版本" >&2
+            cp -a "$BACKUP" "$STAGED"
+            chmod +x "$STAGED"
+            mv -f "$STAGED" "$BINARY"
+            if [ "$REPLACED" -eq 1 ]; then
+                systemctl restart "$SERVICE" 2>/dev/null || true
+                echo "   已恢复并重启备份版本" >&2
+            else
+                echo "   已恢复二进制路径；原进程未中断" >&2
+            fi
         else
             echo "   没有备份可用，服务状态未知" >&2
         fi
@@ -60,7 +67,7 @@ echo "==== [1/5] 备份当前二进制 ===="
 if [ -f "$BINARY" ]; then
     # 如果已有 .prev，先删掉（每次只保留最近一版）
     [ -f "$BACKUP" ] && rm -f "$BACKUP"
-    mv "$BINARY" "$BACKUP"
+    cp -a "$BINARY" "$BACKUP"
     echo "  备份到: $BACKUP ($(ls -lh "$BACKUP" | awk '{print $5}'))"
 else
     echo "  未发现当前二进制，跳过备份"
@@ -69,10 +76,24 @@ fi
 echo "==== [2/5] git pull ===="
 git pull origin main
 
-echo "==== [3/5] 校验新二进制 ===="
-[ -f "$BINARY" ] || { echo "ERROR: pull 后未找到 $BINARY" >&2; exit 1; }
-chmod +x "$BINARY"
+echo "==== [3/5] 校验并解压新二进制 ===="
+[ -s "$ARTIFACT" ] || { echo "ERROR: pull 后未找到 $ARTIFACT" >&2; exit 1; }
+[ -s "$CHECKSUM" ] || { echo "ERROR: pull 后未找到 $CHECKSUM" >&2; exit 1; }
+gzip -t "$ARTIFACT"
+rm -f "$STAGED"
+gzip -dc "$ARTIFACT" > "$STAGED"
+expected_hash="$(awk 'NR == 1 {print $1}' "$CHECKSUM")"
+actual_hash="$(sha256sum "$STAGED" | awk '{print $1}')"
+[ -n "$expected_hash" ] || { echo "ERROR: checksum 文件为空" >&2; exit 1; }
+[ "$actual_hash" = "$expected_hash" ] || {
+    echo "ERROR: 解压后二进制 SHA256 不匹配" >&2
+    exit 1
+}
+chmod +x "$STAGED"
+mv -f "$STAGED" "$BINARY"
+REPLACED=1
 echo "  大小: $(ls -lh "$BINARY" | awk '{print $5}')"
+echo "  SHA256: $actual_hash"
 
 echo "==== [4/5] 重启服务 ===="
 systemctl restart "$SERVICE"
