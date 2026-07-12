@@ -49,6 +49,7 @@
         <label class="input-label">{{ t('admin.accounts.accountName') }}</label>
         <input
           v-model="form.name"
+          data-testid="create-account-name-input"
           type="text"
           required
           class="input"
@@ -149,6 +150,7 @@
           </button>
           <button
             type="button"
+            data-testid="create-platform-grok"
             @click="form.platform = 'grok'"
             :class="[
               'flex flex-1 items-center justify-center gap-2 rounded-md px-4 py-2.5 text-sm font-medium transition-all',
@@ -352,12 +354,13 @@
         </div>
       </div>
 
-      <!-- Account Type Selection (Grok - OAuth only) -->
+      <!-- Account Type Selection (Grok) -->
       <div v-if="form.platform === 'grok'">
         <label class="input-label">{{ t('admin.accounts.accountType') }}</label>
         <div class="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-2" data-tour="account-form-type">
           <button
             type="button"
+            data-testid="create-grok-oauth-type"
             @click="accountCategory = 'oauth-based'"
             :class="[
               'flex items-center gap-3 rounded-lg border-2 p-3 text-left transition-all',
@@ -379,6 +382,33 @@
             <div>
               <span class="block text-sm font-medium text-gray-900 dark:text-white">OAuth</span>
               <span class="text-xs text-gray-500 dark:text-gray-400">{{ t('admin.accounts.types.grokOauth') }}</span>
+            </div>
+          </button>
+
+          <button
+            type="button"
+            data-testid="create-grok-apikey-type"
+            @click="accountCategory = 'apikey'"
+            :class="[
+              'flex items-center gap-3 rounded-lg border-2 p-3 text-left transition-all',
+              accountCategory === 'apikey'
+                ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/20'
+                : 'border-gray-200 hover:border-purple-300 dark:border-dark-600 dark:hover:border-purple-700'
+            ]"
+          >
+            <div
+              :class="[
+                'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg',
+                accountCategory === 'apikey'
+                  ? 'bg-purple-500 text-white'
+                  : 'bg-gray-100 text-gray-500 dark:bg-dark-600 dark:text-gray-400'
+              ]"
+            >
+              <Icon name="key" size="sm" />
+            </div>
+            <div>
+              <span class="block text-sm font-medium text-gray-900 dark:text-white">API Key</span>
+              <span class="text-xs text-gray-500 dark:text-gray-400">{{ t('admin.accounts.types.responsesApi') }}</span>
             </div>
           </button>
         </div>
@@ -1080,6 +1110,7 @@
           <label class="input-label">{{ t('admin.accounts.baseUrl') }}</label>
           <input
             v-model="apiKeyBaseUrl"
+            data-testid="create-apikey-base-url-input"
             type="text"
             class="input"
             :placeholder="
@@ -1087,7 +1118,9 @@
                 ? 'https://api.openai.com'
                 : form.platform === 'gemini'
                   ? 'https://generativelanguage.googleapis.com'
-                  : 'https://api.anthropic.com'
+                  : form.platform === 'grok'
+                    ? 'https://api.x.ai/v1'
+                    : 'https://api.anthropic.com'
             "
           />
           <p class="input-hint">{{ baseUrlHint }}</p>
@@ -1096,6 +1129,7 @@
           <label class="input-label">{{ t('admin.accounts.apiKeyRequired') }}</label>
           <input
             v-model="apiKeyValue"
+            data-testid="create-apikey-value-input"
             type="password"
             required
             class="input font-mono"
@@ -1104,7 +1138,9 @@
                 ? 'sk-proj-...'
                 : form.platform === 'gemini'
                   ? 'AIza...'
-                  : 'sk-ant-...'
+                  : form.platform === 'grok'
+                    ? 'xai-...'
+                    : 'sk-ant-...'
             "
           />
           <p class="input-hint">{{ apiKeyHint }}</p>
@@ -4887,7 +4923,9 @@ const handleSubmit = async () => {
       ? 'https://api.openai.com'
       : form.platform === 'gemini'
         ? 'https://generativelanguage.googleapis.com'
-        : 'https://api.anthropic.com'
+        : form.platform === 'grok'
+          ? 'https://api.x.ai/v1'
+          : 'https://api.anthropic.com'
 
   // Build credentials with optional model mapping
   const credentials: Record<string, unknown> = {

@@ -1654,6 +1654,7 @@ func setDefaults() {
 	viper.SetDefault("security.url_allowlist.enabled", false)
 	viper.SetDefault("security.url_allowlist.upstream_hosts", []string{
 		"api.openai.com",
+		"api.x.ai",
 		"api.anthropic.com",
 		"api.kimi.com",
 		"open.bigmodel.cn",

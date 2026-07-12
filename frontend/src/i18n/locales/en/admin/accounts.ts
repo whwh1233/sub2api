@@ -487,8 +487,8 @@ export default {
         modelRestrictionDisabledByPassthrough: 'Automatic passthrough is enabled: model whitelist/mapping will not take effect.',
       },
       grok: {
-        baseUrlHint: 'Grok OAuth accounts forward to the official xAI API base URL.',
-        apiKeyHint: 'Grok subscription support uses OAuth refresh tokens; API keys are out of scope for this account type.'
+        baseUrlHint: 'Leave blank to use the official xAI API: https://api.x.ai/v1',
+        apiKeyHint: 'Your xAI API Key (typically starts with xai-)'
       },
       anthropic: {
         apiKeyPassthrough: 'Auto passthrough (auth only)',
@@ -889,7 +889,7 @@ export default {
             GROK_OAUTH_PROXY_NOT_FOUND:
               'The selected proxy could not be found. Choose an available proxy and retry.'
           },
-          oauthOnlyHint: 'Initial Grok support is OAuth subscription-backed Responses API text and reasoning traffic only.'
+          oauthOnlyHint: 'Grok supports both OAuth subscriptions and xAI API Keys through the Responses API.'
         },
         // Gemini specific
 	        gemini: {

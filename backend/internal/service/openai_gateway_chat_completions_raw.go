@@ -208,6 +208,13 @@ func (s *OpenAIGatewayService) forwardAsRawChatCompletions(
 
 func (s *OpenAIGatewayService) rawChatCompletionsURL(account *Account) (string, error) {
 	if account.Platform == PlatformGrok {
+		if account.Type == AccountTypeAPIKey {
+			validatedBaseURL, err := s.validateUpstreamBaseURL(account.GetGrokBaseURL())
+			if err != nil {
+				return "", fmt.Errorf("invalid grok base_url: %w", err)
+			}
+			return buildOpenAIChatCompletionsURL(validatedBaseURL), nil
+		}
 		targetURL, err := xai.BuildChatCompletionsURL(account.GetGrokBaseURL())
 		if err != nil {
 			return "", fmt.Errorf("invalid grok base_url: %w", err)

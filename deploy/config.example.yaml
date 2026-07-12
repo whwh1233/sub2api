@@ -91,6 +91,7 @@ security:
     # 允许代理的上游 API 主机列表
     upstream_hosts:
       - "api.openai.com"
+      - "api.x.ai"
       - "api.anthropic.com"
       - "api.kimi.com"
       - "open.bigmodel.cn"

@@ -31,8 +31,8 @@ func (s *OpenAIGatewayService) forwardGrokResponses(
 	reqStream bool,
 	startTime time.Time,
 ) (*OpenAIForwardResult, error) {
-	if account.Type != AccountTypeOAuth {
-		return nil, fmt.Errorf("grok account type %s is not supported by subscription forwarding", account.Type)
+	if account.Type != AccountTypeOAuth && account.Type != AccountTypeAPIKey {
+		return nil, fmt.Errorf("grok account type %s is not supported", account.Type)
 	}
 
 	upstreamModel := account.GetMappedModel(originalModel)
@@ -51,7 +51,7 @@ func (s *OpenAIGatewayService) forwardGrokResponses(
 
 	upstreamCtx, releaseUpstreamCtx := detachUpstreamContext(ctx)
 	defer releaseUpstreamCtx()
-	upstreamReq, err := buildGrokResponsesRequest(upstreamCtx, c, account, patchedBody, token)
+	upstreamReq, err := s.buildGrokResponsesRequest(upstreamCtx, c, account, patchedBody, token)
 	if err != nil {
 		return nil, err
 	}
@@ -457,7 +457,7 @@ func (s *OpenAIGatewayService) describeGrokComposerImage(
 	}
 
 	upstreamCtx, releaseUpstreamCtx := detachUpstreamContext(ctx)
-	upstreamReq, err := buildGrokResponsesRequest(upstreamCtx, c, account, body, token)
+	upstreamReq, err := s.buildGrokResponsesRequest(upstreamCtx, c, account, body, token)
 	releaseUpstreamCtx()
 	if err != nil {
 		return "", OpenAIUsage{}, fmt.Errorf("build grok composer image bridge request: %w", err)
@@ -623,8 +623,8 @@ func addOpenAIUsage(dst *OpenAIUsage, usage OpenAIUsage) {
 	dst.ImageOutputTokens += usage.ImageOutputTokens
 }
 
-func buildGrokResponsesRequest(ctx context.Context, c *gin.Context, account *Account, body []byte, token string) (*http.Request, error) {
-	targetURL, err := xai.BuildResponsesURL(account.GetGrokBaseURL())
+func (s *OpenAIGatewayService) buildGrokResponsesRequest(ctx context.Context, c *gin.Context, account *Account, body []byte, token string) (*http.Request, error) {
+	targetURL, err := s.grokResponsesTargetURL(account)
 	if err != nil {
 		return nil, err
 	}
@@ -635,13 +635,36 @@ func buildGrokResponsesRequest(ctx context.Context, c *gin.Context, account *Acc
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json, text/event-stream")
-	xai.ApplyGrokCLIHeaders(req.Header, gjson.GetBytes(body, "model").String())
+	if account.Type == AccountTypeOAuth {
+		xai.ApplyGrokCLIHeaders(req.Header, gjson.GetBytes(body, "model").String())
+	} else {
+		req.Header.Set("User-Agent", "sub2api-grok/1.0")
+	}
 	if c != nil {
 		if v := c.GetHeader("OpenAI-Beta"); strings.TrimSpace(v) != "" {
 			req.Header.Set("OpenAI-Beta", v)
 		}
 	}
 	return req, nil
+}
+
+func (s *OpenAIGatewayService) grokResponsesTargetURL(account *Account) (string, error) {
+	if account == nil {
+		return "", fmt.Errorf("grok account is required")
+	}
+	if account.Type == AccountTypeAPIKey {
+		validatedBaseURL, err := s.validateUpstreamBaseURL(account.GetGrokBaseURL())
+		if err != nil {
+			return "", fmt.Errorf("invalid grok base_url: %w", err)
+		}
+		return buildOpenAIResponsesURL(validatedBaseURL), nil
+	}
+
+	targetURL, err := xai.BuildResponsesURL(account.GetGrokBaseURL())
+	if err != nil {
+		return "", fmt.Errorf("invalid grok base_url: %w", err)
+	}
+	return targetURL, nil
 }
 
 func (s *OpenAIGatewayService) updateGrokUsageSnapshot(ctx context.Context, accountID int64, snapshot *xai.QuotaSnapshot) {
@@ -662,9 +685,17 @@ func (s *OpenAIGatewayService) handleGrokAccountUpstreamError(ctx context.Contex
 	}
 	switch statusCode {
 	case http.StatusUnauthorized:
-		s.tempUnscheduleGrok(ctx, account, 10*time.Minute, "grok oauth token unauthorized")
+		reason := "grok oauth token unauthorized"
+		if account.Type == AccountTypeAPIKey {
+			reason = "grok api key unauthorized"
+		}
+		s.tempUnscheduleGrok(ctx, account, 10*time.Minute, reason)
 	case http.StatusForbidden:
-		s.tempUnscheduleGrok(ctx, account, 30*time.Minute, "grok entitlement or subscription tier denied")
+		reason := "grok entitlement or subscription tier denied"
+		if account.Type == AccountTypeAPIKey {
+			reason = "grok api key permission denied"
+		}
+		s.tempUnscheduleGrok(ctx, account, 30*time.Minute, reason)
 	case http.StatusTooManyRequests:
 		cooldown := 2 * time.Minute
 		if snapshot := xai.ParseQuotaHeaders(headers, statusCode); snapshot != nil && snapshot.RetryAfterSeconds != nil && *snapshot.RetryAfterSeconds > 0 {

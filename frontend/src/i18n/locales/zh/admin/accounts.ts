@@ -585,8 +585,8 @@ export default {
         modelRestrictionDisabledByPassthrough: '已开启自动透传：模型白名单/映射不会生效。',
       },
       grok: {
-        baseUrlHint: 'Grok OAuth 账号会转发到官方 xAI API Base URL。',
-        apiKeyHint: 'Grok 订阅支持使用 OAuth refresh token；API Key 账号不在本次范围内。'
+        baseUrlHint: '留空使用官方 xAI API：https://api.x.ai/v1',
+        apiKeyHint: '您的 xAI API Key（通常以 xai- 开头）'
       },
       anthropic: {
         apiKeyPassthrough: '自动透传（仅替换认证）',
@@ -976,7 +976,7 @@ export default {
             GROK_OAUTH_PROXY_NOT_FOUND:
               '找不到所选代理。请选择可用代理后重试。'
           },
-          oauthOnlyHint: '首版 Grok 支持仅包含 OAuth 订阅的 Responses API 文本/推理转发。'
+          oauthOnlyHint: 'Grok 支持 OAuth 订阅和 xAI API Key 两种 Responses API 接入方式。'
         },
         // Gemini specific
         gemini: {

@@ -637,17 +637,17 @@ Simple Mode is designed for individual developers or internal teams who want qui
 
 ---
 
-## Grok / xAI OAuth Support
+## Grok / xAI Support
 
-Sub2API supports Grok subscription accounts through xAI OAuth and forwards OpenAI-compatible Responses traffic to xAI.
+Sub2API supports both Grok subscription accounts through xAI OAuth and xAI API Key accounts. API Key accounts only require a Base URL and API Key.
 
 ### Supported Scope
 
 - Platform name: `grok`
-- Account type: OAuth subscription accounts
-- Public Responses targets: `/v1/responses`, `/responses`, and `/backend-api/codex/responses`, forwarded to `${XAI_BASE_URL:-https://api.x.ai/v1}/responses`
+- Account types: OAuth subscription accounts and API Key accounts
+- Public Responses targets: `/v1/responses`, `/responses`, and `/backend-api/codex/responses`, forwarded to the selected account's Responses endpoint
 - Public Claude-compatible target: `/v1/messages`, converted to xAI Responses and returned as Anthropic Messages output for Claude CLI style clients
-- Public Chat Completions targets: `/v1/chat/completions` and `/chat/completions`, forwarded to `${XAI_BASE_URL:-https://api.x.ai/v1}/chat/completions`
+- Public Chat Completions targets: `/v1/chat/completions` and `/chat/completions`, forwarded to the selected account's Chat Completions endpoint
 - Codex CLI style Responses WebSocket ingress is accepted on the Responses targets and bridged to xAI HTTP/SSE Responses upstream
 - Initial text models: `grok-4.3`, `grok-build-0.1`, `grok-4.20-0309-reasoning`, `grok-4.20-0309-non-reasoning`, and `grok-4.20-multi-agent-0309`
 - Media targets for Grok groups: `/v1/images/generations`, `/images/generations`, `/v1/images/edits`, `/images/edits`, `/v1/videos/generations`, `/videos/generations`, `/v1/videos/{request_id}`, and `/videos/{request_id}`. Generation requests require the group image-generation permission.
@@ -677,6 +677,15 @@ Administrators can create or reauthorize Grok accounts from the dashboard, or us
 | `POST /api/v1/admin/grok/accounts/:id/refresh` | Refresh an existing Grok account |
 
 Credential storage reuses the existing account JSON fields: `access_token`, `refresh_token`, `token_type`, `expires_at`, optional `email`, optional `subscription_tier`, and `entitlement_status`.
+
+### API Key Configuration
+
+In the dashboard, choose **Grok → API Key** and enter:
+
+- Base URL: defaults to `https://api.x.ai/v1`; OpenAI-compatible custom endpoints are also supported subject to the server URL allowlist.
+- API Key: an xAI key such as `xai-...`.
+
+API Key credentials are stored in the existing account credential fields `base_url` and `api_key`. Requests use standard Bearer authentication and do not send Grok CLI OAuth identity headers.
 
 ### Usage And Quota Display
 

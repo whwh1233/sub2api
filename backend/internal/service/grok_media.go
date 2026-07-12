@@ -9,6 +9,7 @@ import (
 	"mime"
 	"mime/multipart"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -281,6 +282,39 @@ func (e GrokMediaEndpoint) upstreamURL(baseURL, requestID string) (string, error
 	}
 }
 
+func (s *OpenAIGatewayService) grokMediaUpstreamURL(account *Account, endpoint GrokMediaEndpoint, requestID string) (string, error) {
+	if account == nil {
+		return "", fmt.Errorf("grok account is required")
+	}
+	if account.Type != AccountTypeAPIKey {
+		return endpoint.upstreamURL(account.GetGrokBaseURL(), requestID)
+	}
+
+	validatedBaseURL, err := s.validateUpstreamBaseURL(account.GetGrokBaseURL())
+	if err != nil {
+		return "", fmt.Errorf("invalid grok base_url: %w", err)
+	}
+
+	var endpointPath string
+	switch endpoint {
+	case GrokMediaEndpointImagesGenerations:
+		endpointPath = "/v1/images/generations"
+	case GrokMediaEndpointImagesEdits:
+		endpointPath = "/v1/images/edits"
+	case GrokMediaEndpointVideosGenerations:
+		endpointPath = "/v1/videos/generations"
+	case GrokMediaEndpointVideoStatus:
+		requestID = strings.TrimSpace(requestID)
+		if requestID == "" {
+			return "", fmt.Errorf("request id is required")
+		}
+		endpointPath = "/v1/videos/" + url.PathEscape(requestID)
+	default:
+		return "", fmt.Errorf("unsupported grok media endpoint: %s", endpoint)
+	}
+	return buildOpenAIEndpointURL(validatedBaseURL, endpointPath), nil
+}
+
 func (s *OpenAIGatewayService) ForwardGrokMedia(
 	ctx context.Context,
 	c *gin.Context,
@@ -302,7 +336,7 @@ func (s *OpenAIGatewayService) ForwardGrokMedia(
 	if err != nil {
 		return nil, err
 	}
-	targetURL, err := endpoint.upstreamURL(account.GetGrokBaseURL(), requestID)
+	targetURL, err := s.grokMediaUpstreamURL(account, endpoint, requestID)
 	if err != nil {
 		return nil, err
 	}

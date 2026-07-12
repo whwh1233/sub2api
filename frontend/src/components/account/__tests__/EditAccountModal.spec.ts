@@ -267,6 +267,32 @@ function buildGrokOAuthAccount() {
   } as any
 }
 
+function buildGrokAPIKeyAccount() {
+  return {
+    id: 6,
+    name: 'Grok API Key',
+    notes: '',
+    platform: 'grok',
+    type: 'apikey',
+    credentials: {
+      api_key: 'xai-old-key',
+      base_url: 'https://xai-gateway.example/v1',
+      model_mapping: {
+        'grok-latest': 'grok-4.5'
+      }
+    },
+    extra: {},
+    proxy_id: null,
+    concurrency: 1,
+    priority: 1,
+    rate_multiplier: 1,
+    status: 'active',
+    group_ids: [],
+    expires_at: null,
+    auto_pause_on_expired: false
+  } as any
+}
+
 function buildOpenAISetupTokenAccount() {
   return {
     ...buildAccount(),
@@ -410,6 +436,30 @@ describe('EditAccountModal', () => {
     expect(updateAccountMock.mock.calls[0]?.[1]?.credentials?.model_mapping).toEqual({
       grok: 'grok-build-0.1'
     })
+  })
+
+  it('loads and saves Grok API Key Base URL and a replacement API Key', async () => {
+    const account = buildGrokAPIKeyAccount()
+    updateAccountMock.mockReset()
+    checkMixedChannelRiskMock.mockReset()
+    checkMixedChannelRiskMock.mockResolvedValue({ has_risk: false })
+    updateAccountMock.mockResolvedValue(account)
+
+    const wrapper = mountModal(account)
+    const baseURLInput = wrapper.get('input[placeholder="https://api.x.ai/v1"]')
+    const apiKeyInput = wrapper.get('input[placeholder="xai-..."]')
+
+    expect((baseURLInput.element as HTMLInputElement).value).toBe('https://xai-gateway.example/v1')
+
+    await baseURLInput.setValue(' https://api.x.ai/v1 ')
+    await apiKeyInput.setValue(' xai-new-key ')
+    await wrapper.get('form#edit-account-form').trigger('submit.prevent')
+
+    expect(updateAccountMock).toHaveBeenCalledTimes(1)
+    expect(updateAccountMock.mock.calls[0]?.[1]?.credentials).toEqual(expect.objectContaining({
+      base_url: 'https://api.x.ai/v1',
+      api_key: 'xai-new-key'
+    }))
   })
 
   it('only submits model mapping credentials when saving an OpenAI spark shadow account', async () => {
