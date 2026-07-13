@@ -568,6 +568,33 @@ func (s *BillingService) initFallbackPricing() {
 		LongContextInputThreshold:  1000000,
 		LongContextInputMultiplier: 1,
 	}
+	// Grok 3 Mini custom rate card: $0.30 input / $0.075 cached input /
+	// $0.50 output per MTok. Cached input keeps xAI's 25% input-price ratio.
+	s.fallbackPrices["grok-3-mini"] = &ModelPricing{
+		InputPricePerToken:     0.3e-6,
+		OutputPricePerToken:    0.5e-6,
+		CacheReadPricePerToken: 0.075e-6,
+		SupportsCacheBreakdown: false,
+	}
+	// Grok 3 Mini Fast custom rate card: $0.60 input / $0.15 cached input /
+	// $4.00 output per MTok. Cached input keeps the same 25% ratio.
+	s.fallbackPrices["grok-3-mini-fast"] = &ModelPricing{
+		InputPricePerToken:     0.6e-6,
+		OutputPricePerToken:    4e-6,
+		CacheReadPricePerToken: 0.15e-6,
+		SupportsCacheBreakdown: false,
+	}
+
+	// Grok Composer 2.5 Fast is exposed through the Grok CLI subscription
+	// catalog rather than the public xAI API pricing page. The live catalog
+	// rate is $3 input / $0.50 cached input / $15 output per MTok.
+	s.fallbackPrices["grok-composer-2.5-fast"] = &ModelPricing{
+		InputPricePerToken:     3e-6,
+		OutputPricePerToken:    15e-6,
+		CacheReadPricePerToken: 0.5e-6,
+		SupportsCacheBreakdown: false,
+	}
+
 	// xAI Grok Build 0.1 (official docs: $1 input / $2 output per MTok)
 	s.fallbackPrices["grok-build-0.1"] = &ModelPricing{
 		InputPricePerToken:     1e-6,
@@ -747,6 +774,12 @@ func (s *BillingService) getFallbackPricing(model string) *ModelPricing {
 		return s.fallbackPrices["grok-4.5"]
 	case "grok-4.3":
 		return s.fallbackPrices["grok-4.3"]
+	case "grok-3-mini", "grok-3-mini-latest", "grok-3-mini-beta":
+		return s.fallbackPrices["grok-3-mini"]
+	case "grok-3-mini-fast", "grok-3-mini-fast-latest", "grok-3-mini-fast-beta":
+		return s.fallbackPrices["grok-3-mini-fast"]
+	case "grok-composer", "composer-2.5", "grok-composer-2.5-fast":
+		return s.fallbackPrices["grok-composer-2.5-fast"]
 	case "grok-build", "grok-build-0.1":
 		return s.fallbackPrices["grok-build-0.1"]
 	}
