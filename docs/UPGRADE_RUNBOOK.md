@@ -90,11 +90,21 @@ Never declare validation complete from `/health` alone.
 
 ## 5. Official build and compressed artifact
 
-Run only from the repository root:
+Run only from the repository root. Use the entry point for the current OS:
 
 ```powershell
 .\deploy\local-build-push.ps1
 ```
+
+```bash
+./deploy/local-build-push.sh
+```
+
+On macOS, the script builds a native candidate and runs it against the fresh
+local production database under a network sandbox that allows localhost only.
+It then cross-compiles and verifies the Linux artifact. The macOS script stops
+before Git staging; staging, commit, push, and deployment are separately
+confirmed release steps.
 
 The raw embedded Linux binary exceeded GitHub's 100 MiB limit. Tracked artifacts are:
 

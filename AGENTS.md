@@ -49,13 +49,22 @@ This applies even when the user says to start publishing. Treat that as permissi
 
 ## Production Build Script Discipline
 
-Production packaging must use the repository release script from the repository root:
+Production packaging must use the repository release script for the current OS
+from the repository root:
 
 ```powershell
 .\deploy\local-build-push.ps1
 ```
 
+```bash
+./deploy/local-build-push.sh
+```
+
 Use the script's documented flags only when the user explicitly confirms that variant. Do not manually build, stage, commit, or push `backend/sub2api-linux` as the normal release path. If a manual build artifact was created during troubleshooting, treat it as a temporary local artifact and return to the scripted flow before continuing the release.
+
+The macOS script intentionally stops after artifact creation and verification.
+Git staging, commit, push, and production deployment remain separately confirmed
+steps under the production release confirmation rules above.
 
 The tracked release artifact is now `backend/sub2api-linux.gz` together with
 `backend/sub2api-linux.sha256`; the raw `backend/sub2api-linux` is a local/runtime

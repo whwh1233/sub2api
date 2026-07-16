@@ -135,6 +135,22 @@ func TestBuildSchedulerMetadataAccount_KeepsModelRateLimits(t *testing.T) {
 	require.Nil(t, got.Extra["unused_large_field"])
 }
 
+func TestBuildSchedulerMetadataAccount_KeepsClaudeCodeOnlyGroupIDs(t *testing.T) {
+	account := service.Account{
+		ID:       521,
+		Platform: service.PlatformAnthropic,
+		Extra: map[string]any{
+			"claude_code_only_group_ids": []any{float64(7)},
+			"unused_large_field":         "drop-me",
+		},
+	}
+
+	got := buildSchedulerMetadataAccount(account)
+
+	require.Equal(t, []any{float64(7)}, got.Extra["claude_code_only_group_ids"])
+	require.Nil(t, got.Extra["unused_large_field"])
+}
+
 func TestBuildSchedulerMetadataAccount_KeepsSparkShadowRoutingIdentity(t *testing.T) {
 	parentID := int64(100)
 	account := service.Account{
