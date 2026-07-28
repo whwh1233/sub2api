@@ -15,26 +15,35 @@
   <!-- Default Home Page -->
   <div
     v-else
-    class="relative flex min-h-screen flex-col overflow-hidden bg-[#faf7f0] dark:bg-dark-950"
+    class="relative flex min-h-screen flex-col overflow-hidden bg-gradient-to-br from-gray-50 via-primary-50/30 to-gray-100 dark:from-dark-950 dark:via-dark-900 dark:to-dark-950"
   >
-    <!-- Background Decorations: editorial grid -->
+    <!-- Background Decorations -->
     <div class="pointer-events-none absolute inset-0 overflow-hidden">
       <div
-        class="absolute inset-0 bg-[linear-gradient(rgba(255,107,53,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(255,107,53,0.03)_1px,transparent_1px)] bg-[size:64px_64px]"
+        class="absolute -right-40 -top-40 h-96 w-96 rounded-full bg-primary-400/20 blur-3xl"
+      ></div>
+      <div
+        class="absolute -bottom-40 -left-40 h-96 w-96 rounded-full bg-primary-500/15 blur-3xl"
+      ></div>
+      <div
+        class="absolute left-1/3 top-1/4 h-72 w-72 rounded-full bg-primary-300/10 blur-3xl"
+      ></div>
+      <div
+        class="absolute bottom-1/4 right-1/4 h-64 w-64 rounded-full bg-primary-400/10 blur-3xl"
+      ></div>
+      <div
+        class="absolute inset-0 bg-[linear-gradient(rgba(20,184,166,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(20,184,166,0.03)_1px,transparent_1px)] bg-[size:64px_64px]"
       ></div>
     </div>
 
     <!-- Header -->
-    <header class="relative z-20 px-6 py-5 md:px-8">
+    <header class="relative z-20 px-6 py-4">
       <nav class="mx-auto flex max-w-6xl items-center justify-between">
-        <!-- Logo + brand -->
-        <div class="flex items-center gap-2.5">
-          <div class="h-9 w-9 overflow-hidden rounded-[10px]">
-            <img :src="siteLogo || '/logo.png'" alt="Logo" class="h-full w-full object-cover" />
+        <!-- Logo -->
+        <div class="flex items-center">
+          <div class="h-10 w-10 overflow-hidden rounded-xl shadow-md">
+            <img :src="siteLogo || '/logo.svg'" alt="Logo" class="h-full w-full object-contain" />
           </div>
-          <span class="text-sm font-bold text-gray-900 dark:text-white">
-            {{ siteName }} <span class="text-gray-400 dark:text-dark-500">· 2026</span>
-          </span>
         </div>
 
         <!-- Nav Actions -->
@@ -101,151 +110,265 @@
       </nav>
     </header>
 
-    <!-- Main Content (Magazine + Bento Hybrid) -->
-    <main class="relative z-10 flex-1 px-6 py-8 md:px-8 md:py-12">
+    <!-- Main Content -->
+    <main class="relative z-10 flex-1 px-6 py-16">
       <div class="mx-auto max-w-6xl">
-        <!-- ====== HERO · Magazine Typography ====== -->
-        <section class="py-6 md:py-10">
-          <div class="inline-block border-b border-gray-900 pb-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-gray-600 dark:border-white dark:text-dark-300">
-            ISSUE · 01 · CHATGPT + CLAUDE MODEL POOL
-          </div>
-          <h1 class="mt-5 text-5xl font-black leading-[0.9] text-gray-900 dark:text-white md:text-7xl lg:text-[84px]">
-            {{ siteName }}<span class="bg-gradient-to-r from-[#ff6b35] to-[#ff9166] bg-clip-text text-transparent">.</span>
-          </h1>
-          <div class="mt-6 grid grid-cols-1 items-end gap-6 md:grid-cols-[2fr_1fr] md:gap-10">
-            <div class="max-w-2xl">
-              <p class="text-lg font-bold leading-snug text-gray-900 dark:text-white md:text-2xl">
-                {{ t('home.heroSubtitle') }}
-              </p>
-              <p class="mt-3 text-sm leading-relaxed text-gray-600 dark:text-dark-300 md:text-base">
-                {{ t('home.heroDescription') }}
-              </p>
-              <div class="mt-4 flex flex-wrap gap-2">
-                <span class="rounded-lg border border-gray-900 bg-white/70 px-3 py-1 text-xs font-bold text-gray-900 dark:border-white dark:bg-dark-900/70 dark:text-white">
-                  {{ t('home.providers.chatgpt') }}
-                </span>
-                <span class="rounded-lg border border-[#ebe6dc] bg-white/70 px-3 py-1 text-xs font-bold text-gray-700 dark:border-dark-700 dark:bg-dark-900/70 dark:text-dark-200">
-                  {{ t('home.providers.claude') }}
-                </span>
-                <span class="rounded-lg border border-[#ebe6dc] bg-white/70 px-3 py-1 text-xs font-bold text-gray-700 dark:border-dark-700 dark:bg-dark-900/70 dark:text-dark-200">
-                  {{ t('home.providers.gpt55') }} / {{ t('home.providers.gpt54') }}
-                </span>
-                <span class="rounded-lg border border-[#ebe6dc] bg-white/70 px-3 py-1 text-xs font-bold text-gray-700 dark:border-dark-700 dark:bg-dark-900/70 dark:text-dark-200">
-                  {{ t('home.providers.opus48') }} / {{ t('home.providers.opus47') }}
-                </span>
-              </div>
-            </div>
-            <div class="flex flex-wrap gap-2 md:justify-end">
+        <!-- Hero Section - Left/Right Layout -->
+        <div class="mb-12 flex flex-col items-center justify-between gap-12 lg:flex-row lg:gap-16">
+          <!-- Left: Text Content -->
+          <div class="flex-1 text-center lg:text-left">
+            <h1
+              class="mb-4 text-4xl font-bold text-gray-900 dark:text-white md:text-5xl lg:text-6xl"
+            >
+              {{ siteName }}
+            </h1>
+            <p class="mb-8 text-lg text-gray-600 dark:text-dark-300 md:text-xl">
+              {{ siteSubtitle }}
+            </p>
+
+            <!-- CTA Button -->
+            <div>
               <router-link
                 :to="isAuthenticated ? dashboardPath : '/login'"
-                class="inline-flex items-center gap-2 rounded-lg bg-gray-900 px-5 py-2.5 text-sm font-bold text-white transition-colors hover:bg-black dark:bg-white dark:text-gray-900 dark:hover:bg-gray-200"
+                class="btn btn-primary px-8 py-3 text-base shadow-lg shadow-primary-500/30"
               >
                 {{ isAuthenticated ? t('home.goToDashboard') : t('home.getStarted') }}
-                <Icon name="arrowRight" size="sm" :stroke-width="2.5" />
+                <Icon name="arrowRight" size="md" class="ml-2" :stroke-width="2" />
               </router-link>
-              <a
-                v-if="docUrl"
-                :href="docUrl"
-                target="_blank"
-                rel="noopener noreferrer"
-                class="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-5 py-2.5 text-sm font-semibold text-gray-900 transition-colors hover:bg-gray-100 dark:border-dark-600 dark:text-white dark:hover:bg-dark-800"
-              >
-                {{ t('home.docs') }}
-              </a>
             </div>
           </div>
-        </section>
 
-        <!-- Divider -->
-        <div class="my-8 h-px bg-gray-900 dark:bg-white md:my-10"></div>
-
-        <!-- ====== BENTO data strip ====== -->
-        <section class="grid grid-cols-2 gap-3 md:grid-cols-4">
-          <!-- Tile 1: MODELS -->
-          <div class="rounded-lg border border-[#ebe6dc] bg-white/70 p-4 backdrop-blur-sm dark:border-dark-700 dark:bg-dark-800/60">
-            <div class="text-[10px] font-semibold uppercase tracking-widest text-gray-500 dark:text-dark-400">{{ t('home.modelLineup.title') }}</div>
-            <div class="mt-1 text-3xl font-black text-gray-900 dark:text-white md:text-4xl">4+</div>
-            <div class="mt-1 text-[10px] text-gray-500 dark:text-dark-400">{{ t('home.modelLineup.description') }}</div>
-          </div>
-          <!-- Tile 2: STATUS (filled orange) -->
-          <div class="rounded-lg bg-[#ff6b35] p-4 text-[#0f0f10]">
-            <div class="text-[10px] font-semibold uppercase tracking-widest opacity-80">STATUS</div>
-            <div class="mt-1 text-xl font-black md:text-2xl">●●● Online</div>
-            <div class="mt-1 text-[10px] opacity-75">{{ t('home.modelLineup.soon') }}</div>
-          </div>
-          <!-- Tile 3: CAPACITY -->
-          <div class="rounded-lg border border-[#ebe6dc] bg-white/70 p-4 backdrop-blur-sm dark:border-dark-700 dark:bg-dark-800/60">
-            <div class="text-[10px] font-semibold uppercase tracking-widest text-gray-500 dark:text-dark-400">MAX CAPACITY</div>
-            <div class="mt-1 text-3xl font-black text-gray-900 dark:text-white md:text-4xl">
-              20<span class="text-gray-400 dark:text-dark-500">×</span>
+          <!-- Right: Terminal Animation -->
+          <div class="flex flex-1 justify-center lg:justify-end">
+            <div class="terminal-container">
+              <div class="terminal-window">
+                <!-- Window header -->
+                <div class="terminal-header">
+                  <div class="terminal-buttons">
+                    <span class="btn-close"></span>
+                    <span class="btn-minimize"></span>
+                    <span class="btn-maximize"></span>
+                  </div>
+                  <span class="terminal-title">terminal</span>
+                </div>
+                <!-- Terminal content -->
+                <div class="terminal-body">
+                  <div class="code-line line-1">
+                    <span class="code-prompt">$</span>
+                    <span class="code-cmd">curl</span>
+                    <span class="code-flag">-X POST</span>
+                    <span class="code-url">/v1/messages</span>
+                  </div>
+                  <div class="code-line line-2">
+                    <span class="code-comment"># Routing to upstream...</span>
+                  </div>
+                  <div class="code-line line-3">
+                    <span class="code-success">200 OK</span>
+                    <span class="code-response">{ "content": "Hello!" }</span>
+                  </div>
+                  <div class="code-line line-4">
+                    <span class="code-prompt">$</span>
+                    <span class="cursor"></span>
+                  </div>
+                </div>
+              </div>
             </div>
-            <div class="mt-1 text-[10px] text-gray-500 dark:text-dark-400">Max / Pro 配额池</div>
           </div>
-          <!-- Tile 4: code snippet -->
-          <div class="rounded-lg bg-[#0f0f10] p-4 font-mono text-[11px] leading-relaxed text-gray-300">
-            <div class="text-[9px] uppercase tracking-widest text-gray-500">// 快速开始</div>
-            <div class="mt-1 text-purple-300">base_url</div>
-            <div class="truncate text-blue-300">https://closeai.space</div>
-            <div class="font-bold text-green-400">model: chatgpt/gpt-5.5</div>
-            <div class="text-gray-300">/chat/completions <span class="font-bold text-green-400">→ routed</span></div>
+        </div>
+
+        <!-- Feature Tags - Centered -->
+        <div class="mb-12 flex flex-wrap items-center justify-center gap-4 md:gap-6">
+          <div
+            class="inline-flex items-center gap-2.5 rounded-full border border-gray-200/50 bg-white/80 px-5 py-2.5 shadow-sm backdrop-blur-sm dark:border-dark-700/50 dark:bg-dark-800/80"
+          >
+            <Icon name="swap" size="sm" class="text-primary-500" />
+            <span class="text-sm font-medium text-gray-700 dark:text-dark-200">{{
+              t('home.tags.subscriptionToApi')
+            }}</span>
           </div>
-        </section>
+          <div
+            class="inline-flex items-center gap-2.5 rounded-full border border-gray-200/50 bg-white/80 px-5 py-2.5 shadow-sm backdrop-blur-sm dark:border-dark-700/50 dark:bg-dark-800/80"
+          >
+            <Icon name="shield" size="sm" class="text-primary-500" />
+            <span class="text-sm font-medium text-gray-700 dark:text-dark-200">{{
+              t('home.tags.stickySession')
+            }}</span>
+          </div>
+          <div
+            class="inline-flex items-center gap-2.5 rounded-full border border-gray-200/50 bg-white/80 px-5 py-2.5 shadow-sm backdrop-blur-sm dark:border-dark-700/50 dark:bg-dark-800/80"
+          >
+            <Icon name="chart" size="sm" class="text-primary-500" />
+            <span class="text-sm font-medium text-gray-700 dark:text-dark-200">{{
+              t('home.tags.realtimeBilling')
+            }}</span>
+          </div>
+        </div>
 
-        <!-- Divider -->
-        <div class="my-8 h-px bg-gray-900 dark:bg-white md:my-10"></div>
-
-        <!-- ====== Numbered features (Magazine) ====== -->
-        <section class="grid grid-cols-1 gap-8 md:grid-cols-3 md:gap-10">
-          <div>
-            <div class="text-4xl font-black text-[#ff6b35] md:text-5xl">01</div>
-            <div class="mt-2 text-base font-bold text-gray-900 dark:text-white md:text-lg">
+        <!-- Features Grid -->
+        <div class="mb-12 grid gap-6 md:grid-cols-3">
+          <!-- Feature 1: Unified Gateway -->
+          <div
+            class="group rounded-2xl border border-gray-200/50 bg-white/60 p-6 backdrop-blur-sm transition-all duration-300 hover:shadow-xl hover:shadow-primary-500/10 dark:border-dark-700/50 dark:bg-dark-800/60"
+          >
+            <div
+              class="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 shadow-lg shadow-blue-500/30 transition-transform group-hover:scale-110"
+            >
+              <Icon name="server" size="lg" class="text-white" />
+            </div>
+            <h3 class="mb-2 text-lg font-semibold text-gray-900 dark:text-white">
               {{ t('home.features.unifiedGateway') }}
-            </div>
-            <div class="mt-1 text-xs leading-relaxed text-gray-500 dark:text-dark-400 md:text-sm">
+            </h3>
+            <p class="text-sm leading-relaxed text-gray-600 dark:text-dark-400">
               {{ t('home.features.unifiedGatewayDesc') }}
-            </div>
+            </p>
           </div>
-          <div>
-            <div class="text-4xl font-black text-[#ff6b35] md:text-5xl">02</div>
-            <div class="mt-2 text-base font-bold text-gray-900 dark:text-white md:text-lg">
+
+          <!-- Feature 2: Account Pool -->
+          <div
+            class="group rounded-2xl border border-gray-200/50 bg-white/60 p-6 backdrop-blur-sm transition-all duration-300 hover:shadow-xl hover:shadow-primary-500/10 dark:border-dark-700/50 dark:bg-dark-800/60"
+          >
+            <div
+              class="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-primary-500 to-primary-600 shadow-lg shadow-primary-500/30 transition-transform group-hover:scale-110"
+            >
+              <svg
+                class="h-6 w-6 text-white"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                stroke-width="1.5"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  d="M18 18.72a9.094 9.094 0 003.741-.479 3 3 0 00-4.682-2.72m.94 3.198l.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0112 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 016 18.719m12 0a5.971 5.971 0 00-.941-3.197m0 0A5.995 5.995 0 0012 12.75a5.995 5.995 0 00-5.058 2.772m0 0a3 3 0 00-4.681 2.72 8.986 8.986 0 003.74.477m.94-3.197a5.971 5.971 0 00-.94 3.197M15 6.75a3 3 0 11-6 0 3 3 0 016 0zm6 3a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0zm-13.5 0a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z"
+                />
+              </svg>
+            </div>
+            <h3 class="mb-2 text-lg font-semibold text-gray-900 dark:text-white">
               {{ t('home.features.multiAccount') }}
-            </div>
-            <div class="mt-1 text-xs leading-relaxed text-gray-500 dark:text-dark-400 md:text-sm">
+            </h3>
+            <p class="text-sm leading-relaxed text-gray-600 dark:text-dark-400">
               {{ t('home.features.multiAccountDesc') }}
-            </div>
+            </p>
           </div>
-          <div>
-            <div class="text-4xl font-black text-[#ff6b35] md:text-5xl">03</div>
-            <div class="mt-2 text-base font-bold text-gray-900 dark:text-white md:text-lg">
+
+          <!-- Feature 3: Billing & Quota -->
+          <div
+            class="group rounded-2xl border border-gray-200/50 bg-white/60 p-6 backdrop-blur-sm transition-all duration-300 hover:shadow-xl hover:shadow-primary-500/10 dark:border-dark-700/50 dark:bg-dark-800/60"
+          >
+            <div
+              class="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-purple-500 to-purple-600 shadow-lg shadow-purple-500/30 transition-transform group-hover:scale-110"
+            >
+              <svg
+                class="h-6 w-6 text-white"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                stroke-width="1.5"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  d="M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 013 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 00-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 01-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 003 15h-.75M15 10.5a3 3 0 11-6 0 3 3 0 016 0zm3 0h.008v.008H18V10.5zm-12 0h.008v.008H6V10.5z"
+                />
+              </svg>
+            </div>
+            <h3 class="mb-2 text-lg font-semibold text-gray-900 dark:text-white">
               {{ t('home.features.balanceQuota') }}
-            </div>
-            <div class="mt-1 text-xs leading-relaxed text-gray-500 dark:text-dark-400 md:text-sm">
+            </h3>
+            <p class="text-sm leading-relaxed text-gray-600 dark:text-dark-400">
               {{ t('home.features.balanceQuotaDesc') }}
+            </p>
+          </div>
+        </div>
+
+        <!-- Supported Providers -->
+        <div class="mb-8 text-center">
+          <h2 class="mb-3 text-2xl font-bold text-gray-900 dark:text-white">
+            {{ t('home.providers.title') }}
+          </h2>
+          <p class="text-sm text-gray-600 dark:text-dark-400">
+            {{ t('home.providers.description') }}
+          </p>
+        </div>
+
+        <div class="mb-16 flex flex-wrap items-center justify-center gap-4">
+          <!-- Claude - Supported -->
+          <div
+            class="flex items-center gap-2 rounded-xl border border-primary-200 bg-white/60 px-5 py-3 ring-1 ring-primary-500/20 backdrop-blur-sm dark:border-primary-800 dark:bg-dark-800/60"
+          >
+            <div
+              class="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-orange-400 to-orange-500"
+            >
+              <span class="text-xs font-bold text-white">C</span>
             </div>
+            <span class="text-sm font-medium text-gray-700 dark:text-dark-200">{{ t('home.providers.claude') }}</span>
+            <span
+              class="rounded bg-primary-100 px-1.5 py-0.5 text-[10px] font-medium text-primary-600 dark:bg-primary-900/30 dark:text-primary-400"
+              >{{ t('home.providers.supported') }}</span
+            >
           </div>
-        </section>
-
-        <!-- Divider -->
-        <div class="my-8 h-px bg-gray-900 dark:bg-white md:my-10"></div>
-
-        <!-- ====== Provider text strip ====== -->
-        <section class="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm md:gap-x-6">
-          <div class="text-[10px] font-bold uppercase tracking-[0.2em] text-gray-600 dark:text-dark-300">
-            {{ t('home.providers.title') }} —
+          <!-- GPT - Supported -->
+          <div
+            class="flex items-center gap-2 rounded-xl border border-primary-200 bg-white/60 px-5 py-3 ring-1 ring-primary-500/20 backdrop-blur-sm dark:border-primary-800 dark:bg-dark-800/60"
+          >
+            <div
+              class="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-green-500 to-green-600"
+            >
+              <span class="text-xs font-bold text-white">G</span>
+            </div>
+            <span class="text-sm font-medium text-gray-700 dark:text-dark-200">GPT</span>
+            <span
+              class="rounded bg-primary-100 px-1.5 py-0.5 text-[10px] font-medium text-primary-600 dark:bg-primary-900/30 dark:text-primary-400"
+              >{{ t('home.providers.supported') }}</span
+            >
           </div>
-          <span class="font-bold text-gray-900 dark:text-white">{{ t('home.providers.chatgpt') }}</span>
-          <span class="text-gray-300 dark:text-dark-600">·</span>
-          <span class="font-bold text-gray-900 dark:text-white">{{ t('home.providers.claude') }}</span>
-          <span class="text-gray-300 dark:text-dark-600">·</span>
-          <span class="font-bold text-gray-900 dark:text-white">{{ t('home.providers.gpt55') }}</span>
-          <span class="text-gray-300 dark:text-dark-600">·</span>
-          <span class="font-bold text-gray-900 dark:text-white">{{ t('home.providers.gpt54') }}</span>
-          <span class="text-gray-300 dark:text-dark-600">·</span>
-          <span class="font-bold text-gray-900 dark:text-white">{{ t('home.providers.opus48') }}</span>
-          <span class="text-gray-300 dark:text-dark-600">·</span>
-          <span class="font-bold text-gray-900 dark:text-white">{{ t('home.providers.opus47') }}</span>
-          <span class="ml-auto text-xs text-gray-500 dark:text-dark-400">+ {{ t('home.providers.soon') }}</span>
-        </section>
+          <!-- Gemini - Supported -->
+          <div
+            class="flex items-center gap-2 rounded-xl border border-primary-200 bg-white/60 px-5 py-3 ring-1 ring-primary-500/20 backdrop-blur-sm dark:border-primary-800 dark:bg-dark-800/60"
+          >
+            <div
+              class="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-blue-600"
+            >
+              <span class="text-xs font-bold text-white">G</span>
+            </div>
+            <span class="text-sm font-medium text-gray-700 dark:text-dark-200">{{ t('home.providers.gemini') }}</span>
+            <span
+              class="rounded bg-primary-100 px-1.5 py-0.5 text-[10px] font-medium text-primary-600 dark:bg-primary-900/30 dark:text-primary-400"
+              >{{ t('home.providers.supported') }}</span
+            >
+          </div>
+          <!-- Antigravity - Supported -->
+          <div
+            class="flex items-center gap-2 rounded-xl border border-primary-200 bg-white/60 px-5 py-3 ring-1 ring-primary-500/20 backdrop-blur-sm dark:border-primary-800 dark:bg-dark-800/60"
+          >
+            <div
+              class="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-rose-500 to-pink-600"
+            >
+              <span class="text-xs font-bold text-white">A</span>
+            </div>
+            <span class="text-sm font-medium text-gray-700 dark:text-dark-200">{{ t('home.providers.antigravity') }}</span>
+            <span
+              class="rounded bg-primary-100 px-1.5 py-0.5 text-[10px] font-medium text-primary-600 dark:bg-primary-900/30 dark:text-primary-400"
+              >{{ t('home.providers.supported') }}</span
+            >
+          </div>
+          <!-- More - Coming Soon -->
+          <div
+            class="flex items-center gap-2 rounded-xl border border-gray-200/50 bg-white/40 px-5 py-3 opacity-60 backdrop-blur-sm dark:border-dark-700/50 dark:bg-dark-800/40"
+          >
+            <div
+              class="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-gray-500 to-gray-600"
+            >
+              <span class="text-xs font-bold text-white">+</span>
+            </div>
+            <span class="text-sm font-medium text-gray-700 dark:text-dark-200">{{ t('home.providers.more') }}</span>
+            <span
+              class="rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-gray-500 dark:bg-dark-700 dark:text-dark-400"
+              >{{ t('home.providers.soon') }}</span
+            >
+          </div>
+        </div>
       </div>
     </main>
 
@@ -257,14 +380,23 @@
         <p class="text-sm text-gray-500 dark:text-dark-400">
           &copy; {{ currentYear }} {{ siteName }}. {{ t('home.footer.allRightsReserved') }}
         </p>
-        <div v-if="docUrl" class="flex items-center gap-4">
+        <div class="flex items-center gap-4">
           <a
+            v-if="docUrl"
             :href="docUrl"
             target="_blank"
             rel="noopener noreferrer"
             class="text-sm text-gray-500 transition-colors hover:text-gray-700 dark:text-dark-400 dark:hover:text-white"
           >
             {{ t('home.docs') }}
+          </a>
+          <a
+            :href="githubUrl"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="text-sm text-gray-500 transition-colors hover:text-gray-700 dark:text-dark-400 dark:hover:text-white"
+          >
+            GitHub
           </a>
         </div>
       </div>
@@ -288,6 +420,7 @@ const appStore = useAppStore()
 // Site settings - directly from appStore (already initialized from injected config)
 const siteName = computed(() => appStore.cachedPublicSettings?.site_name || appStore.siteName || 'Sub2API')
 const siteLogo = computed(() => sanitizeUrl(appStore.cachedPublicSettings?.site_logo || appStore.siteLogo || '', { allowRelative: true, allowDataUrl: true }))
+const siteSubtitle = computed(() => appStore.cachedPublicSettings?.site_subtitle || 'AI API Gateway Platform')
 const docUrl = computed(() => sanitizeUrl(appStore.cachedPublicSettings?.doc_url || appStore.docUrl || ''))
 const homeContent = computed(() => appStore.cachedPublicSettings?.home_content || '')
 
@@ -299,6 +432,9 @@ const isHomeContentUrl = computed(() => {
 
 // Theme
 const isDark = ref(document.documentElement.classList.contains('dark'))
+
+// GitHub URL
+const githubUrl = 'https://github.com/Wei-Shaw/sub2api'
 
 // Auth state
 const isAuthenticated = computed(() => authStore.isAuthenticated)
@@ -461,7 +597,7 @@ onMounted(() => {
   color: #a78bfa;
 }
 .code-url {
-  color: #ff6b35;
+  color: #14b8a6;
 }
 .code-comment {
   color: #64748b;
@@ -502,8 +638,8 @@ onMounted(() => {
 :deep(.dark) .terminal-window {
   box-shadow:
     0 25px 50px -12px rgba(0, 0, 0, 0.6),
-    0 0 0 1px rgba(255, 107, 53, 0.2),
-    0 0 40px rgba(255, 107, 53, 0.1),
+    0 0 0 1px rgba(20, 184, 166, 0.2),
+    0 0 40px rgba(20, 184, 166, 0.1),
     inset 0 1px 0 rgba(255, 255, 255, 0.1);
 }
 </style>
