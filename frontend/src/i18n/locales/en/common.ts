@@ -165,6 +165,7 @@ export default {
     affiliateTransferRecords: 'Transfer Records',
     profile: 'Profile',
     users: 'Users',
+    balanceOverview: 'Balance Overview',
     groups: 'Groups',
     channels: 'Channels',
     availableChannels: 'Available Channels',
