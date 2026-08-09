@@ -400,15 +400,17 @@ func (s *BillingService) initFallbackPricing() {
 	}
 
 	// ---- 智谱 GLM（Z.AI）----
-	// Source: https://docs.z.ai/guides/overview/pricing (USD per 1M tokens)
-	// 注意：CacheReadPricePerToken 即"缓存命中"价格，CacheCreationPricePerToken 留空（智谱未公开写入价，按 0 处理）。
-	// GLM-4.6 与 GLM-4.5 在 z.ai 国际版上定价一致；GLM-4.5 国内按 ¥0.8/¥2，汇率换算后约 $0.112/$0.28，与国际版 $0.6/$2.2 不同，本分支采用国际版 USD 口径与现有 Claude/GPT 一致。
-	// GLM-5.2 与 GLM-5.1 在 z.ai 上同价。
+	// GLM-5.2 Source: https://bigmodel.cn/pricing（中国区人民币/百万 tokens 口径）
+	// GLM-5.2 按本站计费约定，将人民币价格数字直接写入 USD 计价字段，不做汇率换算。
+	// cache_creation_tokens 表示首次未命中、形成缓存的输入 token，按普通输入价计费；
+	// 智谱公开的缓存存储当前限时免费，不等于首次输入免费。
+	// 其余 GLM fallback 暂保留原有 z.ai 国际版 USD 口径。
 	s.fallbackPrices["glm-5.2"] = &ModelPricing{
-		InputPricePerToken:     1.4e-6, // $1.40 per MTok
-		OutputPricePerToken:    4.4e-6, // $4.40 per MTok
-		CacheReadPricePerToken: 0.26e-6,
-		SupportsCacheBreakdown: false,
+		InputPricePerToken:         8e-6,  // ¥8 per MTok, stored as $8 per MTok
+		OutputPricePerToken:        28e-6, // ¥28 per MTok, stored as $28 per MTok
+		CacheCreationPricePerToken: 8e-6,  // first uncached input / cache write
+		CacheReadPricePerToken:     2e-6,  // ¥2 per MTok cache hit
+		SupportsCacheBreakdown:     false,
 	}
 	s.fallbackPrices["glm-5.1"] = &ModelPricing{
 		InputPricePerToken:     1.4e-6, // $1.40 per MTok
@@ -489,17 +491,18 @@ func (s *BillingService) initFallbackPricing() {
 
 	// ---- 月之暗面 Kimi（K 系列）----
 	// Source: https://platform.moonshot.cn/docs/pricing/overview (元/百万 tokens 口径)
-	//       交叉验证：https://www.tmtpost.com/7961404.html (USD 口径)
 	// Moonshot V1 (¥2/¥5/¥10 多 tier) 公开页未直接标注 USD 价，本分支不覆盖，避免误计价。
 	// K2-0905 / K2-0711 官方页面未保留定价，不覆盖。
-	// Kimi K3 国际站 USD 价目：https://platform.kimi.ai/docs/pricing/chat-k3.md
+	// Kimi K3 中国区价目：https://platform.kimi.com/docs/pricing/chat-k3
+	// Kimi K3 按本站计费约定，将人民币价格数字直接写入 USD 计价字段，不做汇率换算。
 	// Kimi Code bare aliases（k3 / k3-256k）官方无按 token 价目；复用 API Platform
 	// kimi-k3 档位作代理计费 fallback（同 kimi-for-coding 对 K2.6 的处理口径）。
 	s.fallbackPrices["kimi-k3"] = &ModelPricing{
-		InputPricePerToken:     3e-6,    // $3.00 per MTok (cache miss)
-		OutputPricePerToken:    15e-6,   // $15.00 per MTok
-		CacheReadPricePerToken: 0.30e-6, // $0.30 per MTok (cache hit)
-		SupportsCacheBreakdown: false,
+		InputPricePerToken:         20e-6,  // ¥20 per MTok, stored as $20 per MTok
+		OutputPricePerToken:        100e-6, // ¥100 per MTok, stored as $100 per MTok
+		CacheCreationPricePerToken: 20e-6,  // automatic cache write is first uncached input
+		CacheReadPricePerToken:     2e-6,   // ¥2 per MTok cache hit
+		SupportsCacheBreakdown:     false,
 	}
 	s.fallbackPrices["kimi-k2.6"] = &ModelPricing{
 		InputPricePerToken:     0.95e-6, // $0.95 per MTok (cache miss)

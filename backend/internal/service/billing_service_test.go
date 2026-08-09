@@ -438,14 +438,15 @@ func TestGetFallbackPricing_FamilyMatching(t *testing.T) {
 
 	floatPtr := func(v float64) *float64 { return &v }
 
-	// expectedOutput / expectedCacheRead 为 nil 时跳过该字段断言（保持与原有用例兼容）。
+	// 可选价格为 nil 时跳过该字段断言（保持与原有用例兼容）。
 	tests := []struct {
-		name              string
-		model             string
-		expectedInput     float64
-		expectedOutput    *float64
-		expectedCacheRead *float64
-		expectNilPricing  bool
+		name                  string
+		model                 string
+		expectedInput         float64
+		expectedOutput        *float64
+		expectedCacheCreation *float64
+		expectedCacheRead     *float64
+		expectNilPricing      bool
 	}{
 		{name: "empty model", model: "   ", expectNilPricing: true},
 		{name: "claude opus 4.6", model: "claude-opus-4.6-20260201", expectedInput: 5e-6},
@@ -490,13 +491,14 @@ func TestGetFallbackPricing_FamilyMatching(t *testing.T) {
 			expectedCacheRead: floatPtr(2.8e-9),
 		},
 
-		// ---- 智谱 GLM（z.ai USD 口径）----
+		// ---- 智谱 GLM（中国区人民币数字直接写入 USD 计价字段）----
 		{
-			name:              "glm 5.2 flagship",
-			model:             "glm-5.2",
-			expectedInput:     1.4e-6,
-			expectedOutput:    floatPtr(4.4e-6),
-			expectedCacheRead: floatPtr(0.26e-6),
+			name:                  "glm 5.2 flagship",
+			model:                 "glm-5.2",
+			expectedInput:         8e-6,
+			expectedOutput:        floatPtr(28e-6),
+			expectedCacheCreation: floatPtr(8e-6),
+			expectedCacheRead:     floatPtr(2e-6),
 		},
 		{
 			name:              "glm 5.1 flagship",
@@ -590,11 +592,20 @@ func TestGetFallbackPricing_FamilyMatching(t *testing.T) {
 			expectedCacheRead: floatPtr(0.26e-6),
 		},
 		{
-			name:              "glm 5.2 vs glm 5 ordering (verbatim 5.2)",
-			model:             "glm-5.2",
-			expectedInput:     1.4e-6, // = glm-5.2 价格（不是 glm-5 的 1e-6）
-			expectedOutput:    floatPtr(4.4e-6),
-			expectedCacheRead: floatPtr(0.26e-6),
+			name:                  "glm 5.2 vs glm 5 ordering (verbatim 5.2)",
+			model:                 "glm-5.2",
+			expectedInput:         8e-6, // = glm-5.2 中国区价格（不是 glm-5 的价格）
+			expectedOutput:        floatPtr(28e-6),
+			expectedCacheCreation: floatPtr(8e-6),
+			expectedCacheRead:     floatPtr(2e-6),
+		},
+		{
+			name:                  "glm 5.2 uncensored alias",
+			model:                 "glm-5.2-uncensored",
+			expectedInput:         8e-6,
+			expectedOutput:        floatPtr(28e-6),
+			expectedCacheCreation: floatPtr(8e-6),
+			expectedCacheRead:     floatPtr(2e-6),
 		},
 		{
 			name:              "glm 4.5-air vs glm 4.5 ordering",
@@ -606,39 +617,44 @@ func TestGetFallbackPricing_FamilyMatching(t *testing.T) {
 
 		// ---- 月之暗面 Kimi ----
 		{
-			name:              "kimi k3 flagship",
-			model:             "kimi-k3",
-			expectedInput:     3e-6,
-			expectedOutput:    floatPtr(15e-6),
-			expectedCacheRead: floatPtr(0.30e-6),
+			name:                  "kimi k3 flagship",
+			model:                 "kimi-k3",
+			expectedInput:         20e-6,
+			expectedOutput:        floatPtr(100e-6),
+			expectedCacheCreation: floatPtr(20e-6),
+			expectedCacheRead:     floatPtr(2e-6),
 		},
 		{
-			name:              "kimi code bare alias k3",
-			model:             "k3",
-			expectedInput:     3e-6,
-			expectedOutput:    floatPtr(15e-6),
-			expectedCacheRead: floatPtr(0.30e-6),
+			name:                  "kimi code bare alias k3",
+			model:                 "k3",
+			expectedInput:         20e-6,
+			expectedOutput:        floatPtr(100e-6),
+			expectedCacheCreation: floatPtr(20e-6),
+			expectedCacheRead:     floatPtr(2e-6),
 		},
 		{
-			name:              "kimi code bare alias k3-256k",
-			model:             "k3-256k",
-			expectedInput:     3e-6,
-			expectedOutput:    floatPtr(15e-6),
-			expectedCacheRead: floatPtr(0.30e-6),
+			name:                  "kimi code bare alias k3-256k",
+			model:                 "k3-256k",
+			expectedInput:         20e-6,
+			expectedOutput:        floatPtr(100e-6),
+			expectedCacheCreation: floatPtr(20e-6),
+			expectedCacheRead:     floatPtr(2e-6),
 		},
 		{
-			name:              "kimi k3 path suffix moonshot",
-			model:             "moonshot/kimi-k3",
-			expectedInput:     3e-6,
-			expectedOutput:    floatPtr(15e-6),
-			expectedCacheRead: floatPtr(0.30e-6),
+			name:                  "kimi k3 path suffix moonshot",
+			model:                 "moonshot/kimi-k3",
+			expectedInput:         20e-6,
+			expectedOutput:        floatPtr(100e-6),
+			expectedCacheCreation: floatPtr(20e-6),
+			expectedCacheRead:     floatPtr(2e-6),
 		},
 		{
-			name:              "kimi code bare path suffix",
-			model:             "kimi-code/k3",
-			expectedInput:     3e-6,
-			expectedOutput:    floatPtr(15e-6),
-			expectedCacheRead: floatPtr(0.30e-6),
+			name:                  "kimi code bare path suffix",
+			model:                 "kimi-code/k3",
+			expectedInput:         20e-6,
+			expectedOutput:        floatPtr(100e-6),
+			expectedCacheCreation: floatPtr(20e-6),
+			expectedCacheRead:     floatPtr(2e-6),
 		},
 		{
 			name:              "kimi k2.6 flagship",
@@ -789,10 +805,50 @@ func TestGetFallbackPricing_FamilyMatching(t *testing.T) {
 				require.InDelta(t, *tt.expectedOutput, pricing.OutputPricePerToken, 1e-12,
 					"OutputPricePerToken mismatch for %s", tt.model)
 			}
+			if tt.expectedCacheCreation != nil {
+				require.InDelta(t, *tt.expectedCacheCreation, pricing.CacheCreationPricePerToken, 1e-14,
+					"CacheCreationPricePerToken mismatch for %s", tt.model)
+			}
 			if tt.expectedCacheRead != nil {
 				require.InDelta(t, *tt.expectedCacheRead, pricing.CacheReadPricePerToken, 1e-14,
 					"CacheReadPricePerToken mismatch for %s", tt.model)
 			}
+		})
+	}
+}
+
+func TestCalculateCost_ChineseModelPricingWithGroupMultiplier(t *testing.T) {
+	svc := newTestBillingService()
+	tokens := UsageTokens{
+		InputTokens:         1_000_000,
+		OutputTokens:        1_000_000,
+		CacheCreationTokens: 1_000_000,
+		CacheReadTokens:     1_000_000,
+	}
+
+	tests := []struct {
+		model              string
+		expectedInput      float64
+		expectedOutput     float64
+		expectedCacheWrite float64
+		expectedCacheRead  float64
+	}{
+		{model: "glm-5.2", expectedInput: 8, expectedOutput: 28, expectedCacheWrite: 8, expectedCacheRead: 2},
+		{model: "glm-5.2-uncensored", expectedInput: 8, expectedOutput: 28, expectedCacheWrite: 8, expectedCacheRead: 2},
+		{model: "kimi-k3", expectedInput: 20, expectedOutput: 100, expectedCacheWrite: 20, expectedCacheRead: 2},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.model, func(t *testing.T) {
+			cost, err := svc.CalculateCost(tt.model, tokens, 0.5)
+			require.NoError(t, err)
+			require.InDelta(t, tt.expectedInput, cost.InputCost, 1e-12)
+			require.InDelta(t, tt.expectedOutput, cost.OutputCost, 1e-12)
+			require.InDelta(t, tt.expectedCacheWrite, cost.CacheCreationCost, 1e-12)
+			require.InDelta(t, tt.expectedCacheRead, cost.CacheReadCost, 1e-12)
+			require.InDelta(t,
+				(tt.expectedInput+tt.expectedOutput+tt.expectedCacheWrite+tt.expectedCacheRead)*0.5,
+				cost.ActualCost, 1e-12)
 		})
 	}
 }
