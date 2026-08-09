@@ -16,6 +16,13 @@ Assert-Contains $buildScript 'sub2api-linux\.gz' 'build script must create the g
 Assert-Contains $buildScript 'sub2api-linux\.sha256' 'build script must create the raw binary checksum'
 Assert-Contains $buildScript 'GZipStream|gzip' 'build script must gzip the Linux binary'
 Assert-Contains $buildScript 'Get-FileHash' 'build script must verify artifact integrity'
+Assert-Contains $buildScript '\.local-server-prodtest' 'build script must use the fresh local production clone'
+Assert-Contains $buildScript 'SERVER_DISABLE_BACKGROUND_WORKERS' 'candidate tests must disable background workers'
+Assert-Contains $buildScript 'Invoke-FrontendGate' 'build script must validate HTML and referenced assets'
+Assert-Contains $buildScript 'No Git or production action was performed' 'build script must stop before release mutations'
+if ($buildScript -match '(?m)^\s*git\s+(?:add|commit|push)\b') {
+    throw 'build script must not stage, commit, or push'
+}
 Assert-Contains $remoteScript 'sub2api-linux\.gz' 'remote script must consume the gzip artifact'
 Assert-Contains $remoteScript 'sub2api-linux\.new' 'remote script must install through a staging file'
 Assert-Contains $remoteScript 'sha256sum' 'remote script must verify the raw checksum before replacement'

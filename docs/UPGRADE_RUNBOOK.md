@@ -113,11 +113,18 @@ backend/sub2api-linux.gz
 backend/sub2api-linux.sha256
 ```
 
-The raw `backend/sub2api-linux` is ignored and must not be committed. The build
-script must build the frontend and Windows embed candidate, pause for smoke
-testing, build Linux with `CGO_ENABLED=0` and `-tags=embed`, gzip it, record the
-raw SHA, decompress to a temporary file, require an exact SHA match, and pause
-again before staging/commit/push.
+The raw `backend/sub2api-linux` is ignored and must not be committed. The Windows
+build script must build the frontend and Windows embed candidate, automatically
+run it against `.local-server-prodtest` on an alternate loopback port with
+background workers disabled, and apply the complete frontend gate. It then
+builds Linux with `CGO_ENABLED=0` and `-tags=embed`, gzips it, records the raw
+SHA, decompresses to a temporary file, and requires an exact SHA match.
+
+Despite its historical `local-build-push.ps1` name, the script stops after local
+artifact creation and verification. It must not stage, commit, push, or deploy;
+those remain separately confirmed release steps under `AGENTS.md`. Linux
+execution validation in Docker or the isolated `goodserver` flow in section 6
+is still mandatory before deployment.
 
 The successful 2026-07-11 raw binary was about 103.4 MiB and compressed to about
 31.0 MiB. Gzip is lossless, but checksum equality alone is not an execution test.
