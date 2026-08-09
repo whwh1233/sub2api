@@ -26,6 +26,13 @@ if ($buildScript -match '(?m)^\s*git\s+(?:add|commit|push)\b') {
 Assert-Contains $remoteScript 'sub2api-linux\.gz' 'remote script must consume the gzip artifact'
 Assert-Contains $remoteScript 'sub2api-linux\.new' 'remote script must install through a staging file'
 Assert-Contains $remoteScript 'sha256sum' 'remote script must verify the raw checksum before replacement'
+Assert-Contains $remoteScript 'git pull --ff-only origin main' 'remote script must refuse a non-fast-forward production pull'
+Assert-Contains $remoteScript 'BACKUP_STAGED=' 'remote script must stage the live binary backup before replacing .prev'
+Assert-Contains $remoteScript 'sha256sum "\$BACKUP_STAGED"' 'remote script must verify the staged backup checksum'
+Assert-Contains $remoteScript 'mv -f "\$BACKUP_STAGED" "\$BACKUP"' 'remote script must atomically replace .prev after verification'
+if ($remoteScript -match '(?m)^git pull origin main$') {
+    throw 'remote script must not use an unguarded production pull'
+}
 
 $artifact = Join-Path $repoRoot 'backend\sub2api-linux.gz'
 $checksum = Join-Path $repoRoot 'backend\sub2api-linux.sha256'

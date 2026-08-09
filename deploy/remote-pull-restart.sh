@@ -12,6 +12,7 @@ set -euo pipefail
 REPO_DIR="${REPO_DIR:-/root/sub2api}"
 BINARY="$REPO_DIR/backend/sub2api-linux"
 BACKUP="$BINARY.prev"
+BACKUP_STAGED="$BACKUP.new"
 ARTIFACT="$REPO_DIR/backend/sub2api-linux.gz"
 CHECKSUM="$REPO_DIR/backend/sub2api-linux.sha256"
 STAGED="$REPO_DIR/backend/sub2api-linux.new"
@@ -43,6 +44,7 @@ fi
 # 失败时：替换前恢复路径但不重启；替换后从 .prev 原子回滚并重启。
 rollback_on_fail() {
     local rc=$?
+    rm -f "$BACKUP_STAGED"
     if [ $rc -ne 0 ]; then
         echo ""
         echo "!! 部署失败，处理本地二进制状态..." >&2
@@ -65,16 +67,24 @@ trap rollback_on_fail EXIT
 
 echo "==== [1/5] 备份当前二进制 ===="
 if [ -f "$BINARY" ]; then
-    # 如果已有 .prev，先删掉（每次只保留最近一版）
-    [ -f "$BACKUP" ] && rm -f "$BACKUP"
-    cp -a "$BINARY" "$BACKUP"
+    # 先写入暂存路径并校验，再原子替换 .prev，避免留下部分备份。
+    rm -f "$BACKUP_STAGED"
+    cp -a "$BINARY" "$BACKUP_STAGED"
+    live_hash="$(sha256sum "$BINARY" | awk '{print $1}')"
+    backup_hash="$(sha256sum "$BACKUP_STAGED" | awk '{print $1}')"
+    [ "$backup_hash" = "$live_hash" ] || {
+        echo "ERROR: 当前二进制备份 SHA256 不匹配" >&2
+        exit 1
+    }
+    mv -f "$BACKUP_STAGED" "$BACKUP"
     echo "  备份到: $BACKUP ($(ls -lh "$BACKUP" | awk '{print $5}'))"
+    echo "  SHA256: $backup_hash"
 else
     echo "  未发现当前二进制，跳过备份"
 fi
 
 echo "==== [2/5] git pull ===="
-git pull origin main
+git pull --ff-only origin main
 
 echo "==== [3/5] 校验并解压新二进制 ===="
 [ -s "$ARTIFACT" ] || { echo "ERROR: pull 后未找到 $ARTIFACT" >&2; exit 1; }
