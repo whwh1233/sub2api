@@ -159,7 +159,7 @@ func TestGetModelPricing_FallbackWarnPerModelNotGlobal(t *testing.T) {
 }
 
 // 回归:glm-5.2 必须命中自己的兜底价,不能被 strings.Contains("glm-5") 抢成 glm-5 价。
-// 历史 bug:兜底表缺 glm-5.2 条目,使用记录按 $1.00/$3.20 计费,比官方 $1.40/$4.40 少收约 27%。
+// 历史 bug:兜底表缺 glm-5.2 条目,使用记录会被 glm-5 子串匹配抢走并按错误价格计费。
 func TestGetModelPricing_GLM52UsesOwnPrice(t *testing.T) {
 	svc := newTestBillingService()
 
@@ -167,10 +167,11 @@ func TestGetModelPricing_GLM52UsesOwnPrice(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, got)
 
-	// 官方 z.ai 口径:与 glm-5.1 同价(见 TestGetFallbackPricing_FamilyMatching)。
-	require.InDelta(t, 1.4e-6, got.InputPricePerToken, 1e-12)
-	require.InDelta(t, 4.4e-6, got.OutputPricePerToken, 1e-12)
-	require.InDelta(t, 0.26e-6, got.CacheReadPricePerToken, 1e-12)
+	// 中国区计费约定：人民币/百万 token 的价格数字直接写入 USD 计价字段。
+	require.InDelta(t, 8e-6, got.InputPricePerToken, 1e-12)
+	require.InDelta(t, 28e-6, got.OutputPricePerToken, 1e-12)
+	require.InDelta(t, 8e-6, got.CacheCreationPricePerToken, 1e-12)
+	require.InDelta(t, 2e-6, got.CacheReadPricePerToken, 1e-12)
 }
 
 func TestGetModelPricing_UnknownClaudeModelFallsBackToSonnet(t *testing.T) {

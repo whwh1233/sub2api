@@ -32,6 +32,10 @@ const messages: Record<string, string> = {
   'home.providers.title': 'MODEL LINEUP',
   'home.providers.chatgpt': 'ChatGPT',
   'home.providers.claude': 'Claude',
+  'home.providers.description': '已接入的模型平台',
+  'home.providers.supported': '已支持',
+  'home.providers.gemini': 'Gemini',
+  'home.providers.antigravity': 'Antigravity',
   'home.providers.gpt55': 'GPT 5.5',
   'home.providers.gpt54': 'GPT 5.4',
   'home.providers.opus48': 'Opus 4.8',
@@ -88,7 +92,7 @@ describe('HomeView default marketing copy', () => {
     })
   })
 
-  it('promotes ChatGPT and Claude model pools without unrelated platform names', () => {
+  it('renders the default provider lineup and gateway example', () => {
     const wrapper = mount(HomeView, {
       global: {
         stubs: {
@@ -101,21 +105,14 @@ describe('HomeView default marketing copy', () => {
 
     const text = wrapper.text()
 
-    expect(text).toContain('CHATGPT + CLAUDE MODEL POOL')
-    expect(text).not.toContain('GPT + OPUS MODEL POOL')
+    expect(text).toContain('MODEL LINEUP')
     expect(text).toContain('ChatGPT')
     expect(text).toContain('Claude')
-    expect(text).toContain('GPT 5.5')
-    expect(text).toContain('GPT 5.4')
-    expect(text).toContain('Opus 4.8')
-    expect(text).toContain('Opus 4.7')
-    expect(text).toContain('closeai.space')
-    expect(text).toContain('/chat/completions')
-    expect(text).toContain('→ routed')
-    expect(text).not.toContain('closeai.space/v1')
-    expect(text).not.toContain('/v1/chat/completions')
-    expect(text).not.toContain('Gemini')
-    expect(text).not.toContain('Antigravity')
+    expect(text).toContain('Gemini')
+    expect(text).toContain('Antigravity')
+    expect(text).toContain('/v1/messages')
+    expect(text).toContain('Routing to upstream...')
+    expect(text).toContain('200 OK')
 
     wrapper.unmount()
   })

@@ -2623,6 +2623,10 @@ func (r *stubUsageLogRepo) GetUserSpendingRanking(ctx context.Context, startTime
 	return nil, errors.New("not implemented")
 }
 
+func (r *stubUsageLogRepo) GetDailyLeaderboard(ctx context.Context, startTime, endTime time.Time, currentUserID int64, limit int) (*usagestats.DailyLeaderboardResponse, error) {
+	return nil, errors.New("not implemented")
+}
+
 func (r *stubUsageLogRepo) GetUserStatsAggregated(ctx context.Context, userID int64, startTime, endTime time.Time) (*usagestats.UsageStats, error) {
 	logs := r.userLogs[userID]
 	if len(logs) == 0 {
