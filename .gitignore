@@ -149,3 +149,5 @@ output/
 .local-prod-db-backups/
 .local-server-prodtest/
 
+# Vitest / Vite cache at repo root
+.vite/
