@@ -22,6 +22,7 @@ export interface PromptAuditEndpointDraft extends PromptAuditEndpoint {
 
 export interface PromptAuditConfig {
   enabled: boolean
+  record_only: boolean
   blocking_enabled: boolean
   blocking_latest_turn_only: boolean
   store_pass_events: boolean
@@ -46,6 +47,7 @@ export interface PromptAuditDraft extends Omit<PromptAuditConfig, 'endpoints'> {
 export interface PromptAuditUpdateRequest {
   expected_config_version: number
   enabled: boolean
+  record_only: boolean
   blocking_enabled: boolean
   blocking_latest_turn_only: boolean
   store_pass_events: boolean

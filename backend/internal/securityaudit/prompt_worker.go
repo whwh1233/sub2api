@@ -94,7 +94,7 @@ func (r *Runner) worker(ctx context.Context, workerID int) {
 		case <-ticker.C:
 			r.runtime.heartbeatNS.Store(r.clock.Now().UnixNano())
 			cfg, ok := r.config.Active()
-			if !ok || !cfg.RiskControlEnabled || !cfg.Enabled || workerID >= cfg.WorkerCount {
+			if !ok || !cfg.Enabled || (!cfg.RecordOnly && !cfg.RiskControlEnabled) || workerID >= cfg.WorkerCount {
 				continue
 			}
 			for {
@@ -143,6 +143,25 @@ func (r *Runner) processJob(ctx context.Context, workerID int, cfg ActiveConfig,
 	// The job row only carries redacted metadata; the full prompt for the audit
 	// event is reconstructed here from the transient scan payload.
 	job.Snapshot.FullPrompt = FullPromptFromScanText(scanText)
+	if cfg.RecordOnly {
+		result := &NormalizedResult{
+			Decision: EventPass, RiskLevel: RiskLow, Action: ActionAllow, Safety: "Recorded",
+			Categories: []string{}, MatchedScanners: []string{}, ScannerScores: map[string]float64{}, ScannerEvidence: map[string]string{},
+			ScannerBackend: "record-only", ScannerVersion: "1", PolicyID: "record-only", PolicyVersion: 1,
+		}
+		event, err := r.repo.Complete(ctx, job, result, true)
+		if err != nil {
+			return err
+		}
+		if deleteErr := r.payload.Delete(ctx, job.ID); deleteErr != nil {
+			LogWarn(EventProcessFailed, mergeLogFields(baseFields, map[string]any{"worker_id": workerID, "status": "payload_delete_deferred", "error_code": "payload_delete_failed"}))
+		}
+		LogInfo(EventProcessed, mergeLogFields(baseFields, map[string]any{
+			"worker_id": workerID, "event_id": eventID(event), "decision": result.Decision,
+			"risk_level": result.RiskLevel, "action": result.Action, "status": "recorded",
+		}))
+		return nil
+	}
 	endpoints := cfg.EnabledEndpoints()
 	if len(endpoints) == 0 {
 		return r.finishFailure(ctx, job, &GuardError{Code: "no_enabled_endpoint", Retryable: true})

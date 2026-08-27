@@ -65,6 +65,37 @@ func TestBlockingLatestTurnOnlyConfigRoundTrip(t *testing.T) {
 	require.True(t, public.BlockingLatestTurnOnly)
 }
 
+func TestRecordOnlyConfigNeedsNoGuardEndpointOrRiskControl(t *testing.T) {
+	manager := &ConfigManager{encryptor: prefixEncryptor{}, encryptionKeyConfigured: true}
+	request := UpdateConfigRequest{
+		ExpectedConfigVersion: 1, Enabled: true, RecordOnly: true,
+		Strategy: "priority", WorkerCount: 1, QueueCapacity: 10, AllGroups: true,
+	}
+	next, err := manager.buildNextStorage(DefaultStorageConfig(), request, 9)
+	require.NoError(t, err)
+	require.True(t, next.RecordOnly)
+	require.Empty(t, next.Endpoints)
+	require.Contains(t, changeSummary(next), `"record_only":true`)
+
+	active, err := ActiveFromStorage(next, false, prefixEncryptor{})
+	require.NoError(t, err)
+	require.True(t, active.RecordOnly)
+	require.Equal(t, ModeAsync, active.EffectiveMode())
+	public := PublicFromStorage(next, false, nil)
+	require.True(t, public.RecordOnly)
+	require.Equal(t, ModeAsync, public.EffectiveMode)
+}
+
+func TestRecordOnlyConfigRejectsBlocking(t *testing.T) {
+	request := UpdateConfigRequest{
+		ExpectedConfigVersion: 1, Enabled: true, RecordOnly: true, BlockingEnabled: true,
+		Strategy: "priority", WorkerCount: 1, QueueCapacity: 10, AllGroups: true,
+	}
+	err := validateUpdateConfigRequest(request)
+	require.Error(t, err)
+	require.Equal(t, "prompt_audit_record_only_conflicts_blocking", infraerrors.Reason(err))
+}
+
 func TestConfigRejectsBlockingWithoutAudit(t *testing.T) {
 	storage := DefaultStorageConfig()
 	storage.BlockingEnabled = true
@@ -269,6 +300,7 @@ func TestEffectiveModeTruthTable(t *testing.T) {
 		cfg := ActiveConfig{RiskControlEnabled: tt.risk, Enabled: tt.enabled, BlockingEnabled: tt.blocking}
 		require.Equal(t, tt.want, cfg.EffectiveMode())
 	}
+	require.Equal(t, ModeAsync, (ActiveConfig{Enabled: true, RecordOnly: true}).EffectiveMode(), "record-only capture is independent of risk control")
 }
 
 func TestConfigManagerColdStartOnlyFailsClosedForExplicitBlockingIntent(t *testing.T) {

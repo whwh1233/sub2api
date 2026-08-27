@@ -289,6 +289,34 @@ func TestEnqueuerStagingPayloadPublishProtocolAndFailureCleanup(t *testing.T) {
 	})
 }
 
+func TestRecordOnlyEnqueuesAndPersistsWithoutGuardEndpoint(t *testing.T) {
+	cfg := asyncConfig()
+	cfg.RiskControlEnabled = false
+	cfg.RecordOnly = true
+	cfg.Endpoints = nil
+	cfg.Scanners = nil
+
+	repo := &fakeJobRepository{createJob: &Job{ID: 71}}
+	payload := &fakePayloadStore{values: map[int64]string{}}
+	require.NoError(t, NewEnqueuer(&fakeConfigStore{cfg: cfg, active: true}, repo, payload).Enqueue(context.Background(), asyncRequest()))
+	require.Equal(t, "payload canary text", payload.values[71])
+
+	job := &Job{ID: 71, ClaimVersion: 1, Attempts: 1, MaxAttempts: 3, ConfigVersion: cfg.ConfigVersion, Snapshot: repo.createdSnapshot}
+	scannerCalls := 0
+	runner := NewRunner(&fakeConfigStore{cfg: cfg, active: true}, repo, payload, PromptScannerFunc(func(context.Context, ActiveEndpoint, string, []string) (*NormalizedResult, error) {
+		scannerCalls++
+		return nil, errors.New("record-only must not call scanner")
+	}), NewAtomicMetrics())
+	require.NoError(t, runner.processJob(context.Background(), 0, cfg, job))
+	require.Zero(t, scannerCalls)
+	require.NotNil(t, repo.completedResult)
+	require.Equal(t, "record-only", repo.completedResult.ScannerBackend)
+	require.True(t, repo.completedStore)
+	require.Equal(t, 1, repo.eventCount)
+	require.Contains(t, job.Snapshot.FullPrompt, "payload canary text")
+	require.Equal(t, []int64{71}, payload.deleted)
+}
+
 func TestEnqueuerSkipsOffOutOfScopeAndNoText(t *testing.T) {
 	tests := []struct {
 		name string
