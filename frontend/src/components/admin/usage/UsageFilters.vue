@@ -168,6 +168,44 @@
           <Select v-model="filters.group_id" :options="groupOptions" searchable @change="emitChange" />
         </div>
 
+        <div v-if="mode === 'usage'" class="w-full sm:w-auto sm:min-w-[230px]">
+          <label for="usage-start-time" class="input-label">{{ t('admin.usage.startTime') }}</label>
+          <input
+            id="usage-start-time"
+            v-model="filters.start_time"
+            data-testid="usage-start-time"
+            type="datetime-local"
+            step="1"
+            :max="filters.end_time || undefined"
+            class="input min-h-11 tabular-nums"
+            @change="emitTimeRangeChange"
+          />
+        </div>
+
+        <div v-if="mode === 'usage'" class="w-full sm:w-auto sm:min-w-[230px]">
+          <label for="usage-end-time" class="input-label">{{ t('admin.usage.endTime') }}</label>
+          <input
+            id="usage-end-time"
+            v-model="filters.end_time"
+            data-testid="usage-end-time"
+            type="datetime-local"
+            step="1"
+            :min="filters.start_time || undefined"
+            :aria-invalid="timeRangeInvalid"
+            aria-describedby="usage-time-range-error"
+            class="input min-h-11 tabular-nums"
+            @change="emitTimeRangeChange"
+          />
+          <p
+            v-if="timeRangeInvalid"
+            id="usage-time-range-error"
+            role="alert"
+            class="mt-1 text-xs text-red-600 dark:text-red-400"
+          >
+            {{ t('admin.usage.invalidTimeRange') }}
+          </p>
+        </div>
+
       </div>
 
       <!-- Right: actions -->
@@ -319,6 +357,14 @@ const upstreamModelMismatchOptions = ref<SelectOption[]>([
 ])
 
 const emitChange = () => emit('change')
+const timeRangeInvalid = computed(() => Boolean(
+  filters.value.start_time
+  && filters.value.end_time
+  && filters.value.start_time > filters.value.end_time
+))
+const emitTimeRangeChange = () => {
+  if (!timeRangeInvalid.value) emitChange()
+}
 
 const clearPendingUserSearch = () => {
   if (userSearchTimeout) {

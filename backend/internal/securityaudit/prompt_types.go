@@ -107,6 +107,7 @@ type PromptSnapshot struct {
 	Model              string `json:"model"`
 	PromptHash         string `json:"prompt_hash"`
 	RedactedPreview    string `json:"redacted_preview"`
+	RequestExcerpt     string `json:"request_excerpt"`
 	FullPrompt         string `json:"full_prompt"`
 	PromptLength       int    `json:"prompt_length"`
 	MessageCount       int    `json:"message_count"`

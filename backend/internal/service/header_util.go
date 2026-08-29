@@ -9,7 +9,8 @@ import (
 // Go 的 HTTP server 解析请求时会将所有 header key 转为 Canonical 形式（如 x-app → X-App），
 // 此 map 用于在转发时恢复到真实的 wire format。
 //
-// 来源：对真实 Claude CLI (claude-cli/2.1.81) 到 api.anthropic.com 的 HTTPS 流量抓包。
+// 来源：对真实 Claude CLI 到 api.anthropic.com 的 HTTPS 流量抓包，
+// 并对照官方 CLI 2.1.241 的请求头构造（sLe / DB / Stainless SDK）。
 var headerWireCasing = map[string]string{
 	// Title case
 	"accept":     "Accept",
@@ -30,6 +31,7 @@ var headerWireCasing = map[string]string{
 	"anthropic-dangerous-direct-browser-access": "anthropic-dangerous-direct-browser-access",
 	"anthropic-version":                         "anthropic-version",
 	"anthropic-beta":                            "anthropic-beta",
+	"anthropic-client-platform":                 "anthropic-client-platform",
 	"x-app":                                     "x-app",
 	"content-type":                              "content-type",
 	"accept-language":                           "accept-language",
@@ -57,6 +59,7 @@ var headerWireOrder = []string{
 	"X-Stainless-Runtime-Version",
 	"anthropic-dangerous-direct-browser-access",
 	"anthropic-version",
+	"anthropic-client-platform",
 	"authorization",
 	"x-app",
 	"User-Agent",

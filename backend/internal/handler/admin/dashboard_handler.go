@@ -61,7 +61,29 @@ func parseTimeRange(c *gin.Context) (time.Time, time.Time) {
 		endTime = timezone.StartOfDayInUserLocation(now.AddDate(0, 0, 1), userTZ)
 	}
 
+	// Exact timestamps take precedence over the date-only range. The frontend
+	// sends RFC3339 values converted from the administrator's local time, so no
+	// additional timezone conversion is required here.
+	if exactStart, ok, err := parseExactTimeQuery(c, "start_time"); err == nil && ok {
+		startTime = exactStart
+	}
+	if exactEnd, ok, err := parseExactTimeQuery(c, "end_time"); err == nil && ok {
+		endTime = exactEnd
+	}
+
 	return startTime, endTime
+}
+
+func parseExactTimeQuery(c *gin.Context, name string) (time.Time, bool, error) {
+	raw := strings.TrimSpace(c.Query(name))
+	if raw == "" {
+		return time.Time{}, false, nil
+	}
+	value, err := time.Parse(time.RFC3339, raw)
+	if err != nil {
+		return time.Time{}, true, err
+	}
+	return value, true, nil
 }
 
 func parseOptionalBoolDashboardFilter(c *gin.Context, name string) (*bool, error) {

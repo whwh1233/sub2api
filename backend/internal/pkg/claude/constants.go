@@ -5,10 +5,10 @@ package claude
 
 // Beta header 常量
 //
-// 这里的常量对齐真实 Claude Code CLI 的最新流量（截至 2026-04）。
-// 选型参考：与 Parrot (src/transform/cc_mimicry.py) 的 BETAS 保持一致，
-// 原因：Anthropic 上游会基于 anthropic-beta 的完整集合判定请求来源；
-// 缺少任何"官方 Claude Code 请求才会带"的 beta，都会被降级到第三方额度，
+// 这里的常量对齐真实 Claude Code CLI 的最新流量（截至官方 CLI 2.1.241，
+// 本机 @anthropic-ai/claude-code 2026-08-22 构建）。
+// Anthropic 上游会基于 anthropic-beta 的集合判定请求来源；
+// 缺少官方 Claude Code 请求才会带的 beta，会被降级到第三方额度，
 // 对应报错：`Third-party apps now draw from your extra usage, not your plan limits.`
 const (
 	BetaOAuth                    = "oauth-2025-04-20"
@@ -19,8 +19,9 @@ const (
 	BetaContext1M                = "context-1m-2025-08-07"
 	BetaFastMode                 = "fast-mode-2026-02-01"
 
-	// 新增（对齐官方 CLI 2.1.9x 以来的流量）
+	// 对齐官方 CLI 2.1.241 的 Ux() beta 注册表（主 messages 路径会按能力选子集）
 	BetaPromptCachingScope = "prompt-caching-scope-2026-01-05"
+	BetaPromptCachingEvict = "prompt-caching-evict-2026-05-12"
 	BetaEffort             = "effort-2025-11-24"
 	BetaRedactThinking     = "redact-thinking-2026-02-12"
 	BetaContextManagement  = "context-management-2025-06-27"
@@ -66,25 +67,37 @@ const DefaultCacheControlTTL = "5m"
 // CLICurrentVersion 是 sub2api 当前对外伪装的 Claude Code CLI 版本号（三段 semver）。
 // 用于 billing attribution block 中的 cc_version=X.Y.Z.{fp} 前缀以及 fingerprint 计算。
 // 必须与 DefaultHeaders["User-Agent"] 中的版本号严格一致；不一致会被 Anthropic 判第三方。
-const CLICurrentVersion = "2.1.220"
+//
+// 对齐本机官方 CLI：@anthropic-ai/claude-code@2.1.241（BUILD_TIME 2026-08-22T22:46:48Z）。
+const CLICurrentVersion = "2.1.241"
+
+// CLIStainlessPackageVersion 是官方 CLI 内嵌 Anthropic JS SDK 的 X-Stainless-Package-Version。
+// 2.1.241 二进制中 FMe="0.112.1"。
+const CLIStainlessPackageVersion = "0.112.1"
+
+// CLIClientPlatform 是官方 CLI 默认入口（cli）对应的 anthropic-client-platform。
+// 见 2.1.241 DB()：case "cli": default: return "claude_code_cli"。
+const CLIClientPlatform = "claude_code_cli"
 
 // FullClaudeCodeMimicryBetas 返回最"像"真实 Claude Code CLI 的完整 beta 列表，
 // 用于 OAuth 账号伪装成 Claude Code 时使用。
-// 顺序与真实 CLI 抓包一致。
+// 顺序对齐官方 CLI 2.1.241 的 Ux() 注册表（jWb），只取第一方身份判定稳定携带的子集。
 //
 // 使用建议：
 //   - OAuth mimic：所有模型（包括 Haiku）都使用这整份列表。
 //   - OAuth 真实客户端透传：保留客户端 beta；未提供时使用模型对应默认值。
 //   - API-key 账号：不要使用本函数，参见 APIKeyBetaHeader。
 //   - 不默认加入 redact-thinking，避免上游抹除 thinking 内容；客户端显式传入时由合并逻辑保留。
+//   - 不默认加入 context-1m / fast-mode / 内部 latch（x-cc-internal-*）等能力门闩或实验项。
 func FullClaudeCodeMimicryBetas() []string {
 	return []string{
 		BetaClaudeCode,
 		BetaOAuth,
 		BetaInterleavedThinking,
-		BetaPromptCachingScope,
-		BetaEffort,
 		BetaContextManagement,
+		BetaEffort,
+		BetaPromptCachingScope,
+		BetaPromptCachingEvict,
 		BetaExtendedCacheTTL,
 	}
 }
@@ -93,10 +106,10 @@ func FullClaudeCodeMimicryBetas() []string {
 var DefaultHeaders = map[string]string{
 	// Keep these in sync with recent Claude CLI traffic to reduce the chance
 	// that Claude Code-scoped OAuth credentials are rejected as "non-CLI" usage.
-	// 版本参考：对齐 Parrot (src/transform/cc_mimicry.py:49) 的 CLI_USER_AGENT。
+	// UA 对齐 2.1.241 sLe()：`claude-cli/${VERSION} (external, ${ENTRYPOINT??"cli"})`
 	"User-Agent":                                "claude-cli/" + CLICurrentVersion + " (external, cli)",
 	"X-Stainless-Lang":                          "js",
-	"X-Stainless-Package-Version":               "0.94.0",
+	"X-Stainless-Package-Version":               CLIStainlessPackageVersion,
 	"X-Stainless-OS":                            "Linux",
 	"X-Stainless-Arch":                          "arm64",
 	"X-Stainless-Runtime":                       "node",
@@ -104,6 +117,7 @@ var DefaultHeaders = map[string]string{
 	"X-Stainless-Retry-Count":                   "0",
 	"X-Stainless-Timeout":                       "600",
 	"X-App":                                     "cli",
+	"anthropic-client-platform":                 CLIClientPlatform,
 	"Anthropic-Dangerous-Direct-Browser-Access": "true",
 }
 

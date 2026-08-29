@@ -174,6 +174,65 @@ const mountRouteFilteredUsageView = () => mount(UsageView, {
   } },
 })
 
+describe('admin UsageView scrolling pagination layout', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+    list.mockReset().mockResolvedValue({ items: [], total: 400, pages: 20 })
+    getStats.mockReset().mockResolvedValue({
+      total_requests: 0,
+      total_input_tokens: 0,
+      total_output_tokens: 0,
+      total_cache_tokens: 0,
+      total_tokens: 0,
+      total_cost: 0,
+      total_actual_cost: 0,
+      average_duration_ms: 0,
+    })
+    getSnapshotV2.mockReset().mockResolvedValue({ trend: [], models: [], groups: [] })
+    getModelStats.mockReset().mockResolvedValue({ models: [] })
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('keeps pagination outside the scrollable table body and resets body scroll on page change', async () => {
+    const ScrollableUsageTableStub = defineComponent({
+      props: ['data', 'loading', 'columns'],
+      template: '<div><div class="table-wrapper"></div></div>',
+    })
+    const PaginationButtonStub = defineComponent({
+      emits: ['update:page', 'update:pageSize'],
+      template: '<button data-test="next-page" @click="$emit(\'update:page\', 2)">next</button>',
+    })
+
+    const wrapper = mount(UsageView, {
+      global: { stubs: {
+        AppLayout: AppLayoutStub, UsageStatsCards: true, UsageFilters: UsageFiltersStub,
+        UsageTable: ScrollableUsageTableStub, UsageExportProgress: true, UsageCleanupDialog: true,
+        UserBalanceHistoryModal: true, Pagination: PaginationButtonStub, Select: true,
+        DateRangePicker: true, Icon: true, TokenUsageTrend: true,
+        ModelDistributionChart: true, GroupDistributionChart: true,
+        EndpointDistributionChart: true, UserTokenRanking: true,
+        OpsErrorLogTable: true, OpsErrorDetailModal: true,
+      } },
+    })
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="usage-detail-card"]').classes()).toContain('usage-detail-card--scrolling')
+    expect(wrapper.get('[data-testid="usage-pagination"]').element.parentElement)
+      .toBe(wrapper.get('[data-testid="usage-table-panel"]').element)
+
+    const scroller = wrapper.get('.table-wrapper').element as HTMLElement
+    scroller.scrollTop = 240
+    await wrapper.get('[data-test="next-page"]').trigger('click')
+    await flushPromises()
+
+    expect(scroller.scrollTop).toBe(0)
+    expect(list).toHaveBeenLastCalledWith(expect.objectContaining({ page: 2 }), expect.anything())
+  })
+})
+
 describe('admin UsageView route filters', () => {
   beforeEach(() => {
     vi.useFakeTimers()
@@ -268,6 +327,26 @@ describe('admin UsageView route filters', () => {
 
     expect(list).toHaveBeenCalledWith(expect.objectContaining({ user_id: 42 }), expect.anything())
     expect(wrapper.find('[data-test="user-filter-label"]').text()).toBe('42')
+  })
+
+  it('converts the exact local time range to inclusive-second RFC3339 API boundaries', async () => {
+    const wrapper = mountRouteFilteredUsageView()
+    await flushPromises()
+    list.mockClear()
+
+    const startLocal = '2026-08-29T13:37:55'
+    const endLocal = '2026-08-29T15:19:25'
+    ;(wrapper.vm as any).filters.start_time = startLocal
+    ;(wrapper.vm as any).filters.end_time = endLocal
+    wrapper.findComponent(UsageFiltersStub).vm.$emit('change')
+    await flushPromises()
+
+    const expectedEnd = new Date(endLocal)
+    expectedEnd.setSeconds(expectedEnd.getSeconds() + 1)
+    expect(list).toHaveBeenLastCalledWith(expect.objectContaining({
+      start_time: new Date(startLocal).toISOString(),
+      end_time: expectedEnd.toISOString(),
+    }), expect.anything())
   })
 })
 

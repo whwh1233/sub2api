@@ -77,13 +77,13 @@ func isAcceptableFingerprintUserAgent(ua string) bool {
 
 // 默认指纹值（当客户端未提供时使用）
 var defaultFingerprint = Fingerprint{
-	UserAgent:               "claude-cli/" + claude.CLICurrentVersion + " (external, cli)",
-	StainlessLang:           "js",
-	StainlessPackageVersion: "0.94.0",
-	StainlessOS:             "Linux",
-	StainlessArch:           "arm64",
-	StainlessRuntime:        "node",
-	StainlessRuntimeVersion: "v24.3.0",
+	UserAgent:               claude.DefaultHeaders["User-Agent"],
+	StainlessLang:           claude.DefaultHeaders["X-Stainless-Lang"],
+	StainlessPackageVersion: claude.DefaultHeaders["X-Stainless-Package-Version"],
+	StainlessOS:             claude.DefaultHeaders["X-Stainless-OS"],
+	StainlessArch:           claude.DefaultHeaders["X-Stainless-Arch"],
+	StainlessRuntime:        claude.DefaultHeaders["X-Stainless-Runtime"],
+	StainlessRuntimeVersion: claude.DefaultHeaders["X-Stainless-Runtime-Version"],
 }
 
 // Fingerprint represents account fingerprint data

@@ -65,8 +65,12 @@
         </div>
       </div>
       <!-- 明细区：tab 栏 + 筛选 + 内容收进同一张卡片，消除割裂感 -->
-      <div class="card">
-        <div class="flex flex-wrap items-center border-b border-gray-200 px-2 dark:border-dark-700 sm:px-4">
+      <div
+        data-testid="usage-detail-card"
+        class="card"
+        :class="{ 'usage-detail-card--scrolling': activeTab === 'usage' }"
+      >
+        <div class="flex shrink-0 flex-wrap items-center border-b border-gray-200 px-2 dark:border-dark-700 sm:px-4">
           <button
             v-for="tab in detailTabs"
             :key="tab.key"
@@ -83,7 +87,7 @@
           </button>
         </div>
 
-        <UsageFilters v-model="filters" ref="usageFiltersRef" flat :mode="activeTab" class="border-b border-gray-100 dark:border-dark-700/50" :start-date="startDate" :end-date="endDate" :exporting="exporting" :model-options="modelNameOptions" @change="applyFilters" @refresh="refreshData" @reset="resetFilters" @cleanup="openCleanupDialog" @export="exportToExcel">
+        <UsageFilters v-model="filters" ref="usageFiltersRef" flat :mode="activeTab" class="shrink-0 border-b border-gray-100 dark:border-dark-700/50" :start-date="startDate" :end-date="endDate" :exporting="exporting" :model-options="modelNameOptions" @change="applyFilters" @refresh="refreshData" @reset="resetFilters" @cleanup="openCleanupDialog" @export="exportToExcel">
           <template #after-reset>
             <div v-if="activeTab !== 'ranking'" class="relative" ref="columnDropdownRef">
               <button
@@ -120,9 +124,15 @@
           </template>
         </UsageFilters>
 
-        <div v-show="activeTab === 'usage'" class="overflow-hidden rounded-b-2xl">
+        <div
+          v-show="activeTab === 'usage'"
+          ref="usageTablePanelRef"
+          data-testid="usage-table-panel"
+          class="flex min-h-0 flex-1 flex-col overflow-hidden rounded-b-2xl"
+        >
           <UsageTable
             flat
+            class="min-h-0 flex-1"
             :data="usageLogs"
             :loading="loading"
             :columns="visibleColumns"
@@ -133,7 +143,9 @@
             @userClick="handleUserClick"
             @ipGeoBatchFailed="handleIpGeoBatchFailed"
           />
-          <Pagination v-if="pagination.total > 0" :page="pagination.page" :total="pagination.total" :page-size="pagination.page_size" @update:page="handlePageChange" @update:pageSize="handlePageSizeChange" />
+          <div v-if="pagination.total > 0" data-testid="usage-pagination" class="shrink-0">
+            <Pagination :page="pagination.page" :total="pagination.total" :page-size="pagination.page_size" @update:page="handlePageChange" @update:pageSize="handlePageSizeChange" />
+          </div>
         </div>
         <div v-show="activeTab === 'errors'" class="overflow-hidden rounded-b-2xl">
           <OpsErrorLogTable
@@ -182,7 +194,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, reactive, computed, nextTick, onMounted, onUnmounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { saveAs } from 'file-saver'
 import { useRoute } from 'vue-router'
@@ -361,7 +373,9 @@ const onDateRangeChange = (range: { startDate: string; endDate: string; preset: 
   filters.value = {
     ...filters.value,
     start_date: range.startDate,
-    end_date: range.endDate
+    end_date: range.endDate,
+    start_time: undefined,
+    end_time: undefined,
   }
   granularity.value = getGranularityForRange(range.startDate, range.endDate)
   applyFilters()
@@ -379,9 +393,32 @@ const buildUsageListParams = (
     page_size: pageSize,
     exact_total: exactTotal,
     ...filters.value,
+    ...buildExactTimeRangeParams(),
     stream: legacyStream === null ? undefined : legacyStream,
     sort_by: sortState.sort_by,
     sort_order: sortState.sort_order
+  }
+}
+
+const localDateTimeToISOString = (value: string | undefined, includeWholeSecond = false): string | undefined => {
+  if (!value) return undefined
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) return undefined
+  if (includeWholeSecond) parsed.setSeconds(parsed.getSeconds() + 1)
+  return parsed.toISOString()
+}
+
+const buildExactTimeRangeParams = (): Pick<AdminUsageQueryParams, 'start_time' | 'end_time'> => {
+  const localStart = filters.value.start_time
+  const localEnd = filters.value.end_time
+  if (localStart && localEnd && localStart > localEnd) {
+    return { start_time: undefined, end_time: undefined }
+  }
+  return {
+    start_time: localDateTimeToISOString(localStart),
+    // The repository uses a half-open upper bound. Add one second so a value
+    // entered to second precision includes that entire displayed second.
+    end_time: localDateTimeToISOString(localEnd, true),
   }
 }
 
@@ -403,6 +440,7 @@ const loadStats = async (force = false) => {
     const legacyStream = requestType ? requestTypeToLegacyStream(requestType) : filters.value.stream
     const s = await adminAPI.usage.getStats({
       ...filters.value,
+      ...buildExactTimeRangeParams(),
       stream: legacyStream === null ? undefined : legacyStream,
       ...(force ? { nocache: 1 } : {}),
     })
@@ -442,6 +480,7 @@ const loadModelStats = async (source: ModelDistributionSource, force = false) =>
     const baseParams = {
       start_date: filters.value.start_date || startDate.value,
       end_date: filters.value.end_date || endDate.value,
+      ...buildExactTimeRangeParams(),
       user_id: filters.value.user_id,
       model: filters.value.model,
       api_key_id: filters.value.api_key_id,
@@ -491,6 +530,7 @@ const loadChartData = async () => {
     const snapshot = await adminAPI.dashboard.getSnapshotV2({
       start_date: filters.value.start_date || startDate.value,
       end_date: filters.value.end_date || endDate.value,
+      ...buildExactTimeRangeParams(),
       granularity: granularity.value,
       user_id: filters.value.user_id,
       model: filters.value.model,
@@ -539,12 +579,28 @@ const resetFilters = () => {
   const range = getLast24HoursRangeDates()
   startDate.value = range.start
   endDate.value = range.end
-  filters.value = { start_date: startDate.value, end_date: endDate.value, request_type: undefined, billing_type: null, billing_mode: undefined }
+  filters.value = { start_date: startDate.value, end_date: endDate.value, start_time: undefined, end_time: undefined, request_type: undefined, billing_type: null, billing_mode: undefined }
   granularity.value = getGranularityForRange(startDate.value, endDate.value)
   applyFilters()
 }
-const handlePageChange = (p: number) => { pagination.page = p; loadLogs() }
-const handlePageSizeChange = (s: number) => { pagination.page_size = s; pagination.page = 1; loadLogs() }
+const resetUsageTableScroll = async () => {
+  await nextTick()
+  const scroller = usageTablePanelRef.value?.querySelector<HTMLElement>('.table-wrapper')
+  if (scroller) scroller.scrollTop = 0
+}
+const handlePageChange = async (p: number) => {
+  pagination.page = p
+  await resetUsageTableScroll()
+  await loadLogs()
+  await resetUsageTableScroll()
+}
+const handlePageSizeChange = async (s: number) => {
+  pagination.page_size = s
+  pagination.page = 1
+  await resetUsageTableScroll()
+  await loadLogs()
+  await resetUsageTableScroll()
+}
 const handleSort = (key: string, order: 'asc' | 'desc') => {
   sortState.sort_by = key
   sortState.sort_order = order
@@ -779,6 +835,7 @@ const detailTabs = computed(() => [
   { key: 'ranking' as const, label: t('usage.tabs.ranking'), icon: 'chart' as const },
 ])
 const usageFiltersRef = ref<InstanceType<typeof UsageFilters> | null>(null)
+const usageTablePanelRef = ref<HTMLElement | null>(null)
 const rankingMounted = ref(false)
 const rankingRef = ref<InstanceType<typeof UserTokenRanking> | null>(null)
 
@@ -806,12 +863,13 @@ const toRFC3339 = (d: string | undefined, endOfDay = false): string | undefined 
 const loadAdminErrors = async () => {
   errLoading.value = true
   try {
+    const exactRange = buildExactTimeRangeParams()
     const resp = await listErrorLogs({
       page: errPage.value,
       page_size: errPageSize.value,
       view: 'all',
-      start_time: toRFC3339(filters.value.start_date),
-      end_time: toRFC3339(filters.value.end_date, true),
+      start_time: exactRange.start_time ?? toRFC3339(filters.value.start_date),
+      end_time: exactRange.end_time ?? toRFC3339(filters.value.end_date, true),
       user_id: filters.value.user_id ?? undefined,
       api_key_id: filters.value.api_key_id ?? undefined,
       account_id: filters.value.account_id ?? undefined,
@@ -873,3 +931,14 @@ watch(modelDistributionSource, (source) => {
 
 defineExpose({ requestedModelStats, refreshData })
 </script>
+
+<style scoped>
+@media (min-width: 1024px) {
+  .usage-detail-card--scrolling {
+    display: flex;
+    min-height: 32rem;
+    height: calc(100dvh - 5rem);
+    flex-direction: column;
+  }
+}
+</style>

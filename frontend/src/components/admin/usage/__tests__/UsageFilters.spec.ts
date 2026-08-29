@@ -33,6 +33,9 @@ const messages: Record<string, string> = {
 	'admin.usage.upstreamModelMismatchOnly': 'Mismatched only',
 	'admin.usage.upstreamModelMatchedOnly': 'Matched only',
   'admin.usage.group': 'Group',
+  'admin.usage.startTime': 'Start time',
+  'admin.usage.endTime': 'End time',
+  'admin.usage.invalidTimeRange': 'End time cannot be earlier than start time',
   'admin.usage.allGroups': 'All Groups',
   'common.refresh': 'Refresh',
   'common.reset': 'Reset',
@@ -83,6 +86,8 @@ const defaultFilters = () => ({
   group_id: null,
   start_date: '',
   end_date: '',
+  start_time: undefined,
+  end_time: undefined,
 })
 
 function mountFilters(filters = defaultFilters()) {
@@ -257,5 +262,34 @@ describe('UsageFilters — model options come from prop (no dup request)', () =>
 
     const opts = (wrapper.vm as any).modelOptions as Array<{ value: string | null; label: string }>
     expect(opts.map((o) => o.value)).toEqual([null, 'claude-3', 'gpt-4o'])
+  })
+})
+
+describe('UsageFilters — exact time range', () => {
+  it('renders second-precision datetime inputs and emits change for a valid range', async () => {
+    const wrapper = mountFilters()
+    const start = wrapper.get('[data-testid="usage-start-time"]')
+    const end = wrapper.get('[data-testid="usage-end-time"]')
+
+    expect(start.attributes('step')).toBe('1')
+    expect(end.attributes('step')).toBe('1')
+
+    await start.setValue('2026-08-29T13:37:55')
+    await end.setValue('2026-08-29T15:19:25')
+
+    expect(wrapper.props('modelValue').start_time).toBe('2026-08-29T13:37:55.000')
+    expect(wrapper.props('modelValue').end_time).toBe('2026-08-29T15:19:25.000')
+    expect(wrapper.emitted('change')).toHaveLength(2)
+  })
+
+  it('shows an inline error and does not apply an inverted range', async () => {
+    const wrapper = mountFilters()
+    await wrapper.get('[data-testid="usage-start-time"]').setValue('2026-08-29T15:19:25')
+    const priorChangeCount = wrapper.emitted('change')?.length ?? 0
+
+    await wrapper.get('[data-testid="usage-end-time"]').setValue('2026-08-29T13:37:55')
+
+    expect(wrapper.get('[role="alert"]').text()).toBe('End time cannot be earlier than start time')
+    expect(wrapper.emitted('change')?.length ?? 0).toBe(priorChangeCount)
   })
 })

@@ -2087,6 +2087,8 @@ export interface UsageQueryParams {
   billing_mode?: string | null
   start_date?: string
   end_date?: string
+  start_time?: string
+  end_time?: string
   timezone?: string
   sort_by?: string
   sort_order?: 'asc' | 'desc'

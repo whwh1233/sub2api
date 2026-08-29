@@ -436,6 +436,7 @@ var allowedHeaders = map[string]bool{
 	"x-stainless-helper-method":                 true,
 	"anthropic-dangerous-direct-browser-access": true,
 	"anthropic-version":                         true,
+	"anthropic-client-platform":                 true,
 	"x-app":                                     true,
 	"anthropic-beta":                            true,
 	"accept-language":                           true,

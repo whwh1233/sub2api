@@ -15,7 +15,11 @@ vi.mock('vue-i18n', async () => {
 })
 
 const DialogStub = defineComponent({ props: ['show', 'title'], emits: ['close'], template: '<div v-if="show" data-test="dialog"><slot /><slot name="footer" /></div>' })
-const PaginationStub = defineComponent({ props: ['total', 'page', 'pageSize'], emits: ['update:page', 'update:pageSize'], template: '<div data-test="pagination" />' })
+const PaginationStub = defineComponent({
+  props: ['total', 'page', 'pageSize'],
+  emits: ['update:page', 'update:pageSize'],
+  template: '<div data-test="pagination"><button data-test="page-next" @click="$emit(\'update:page\', 2)">next</button><button data-test="page-size" @click="$emit(\'update:pageSize\', 100)">size</button></div>',
+})
 
 const endpoint = (): PromptAuditEndpointDraft => ({
   id: 'guard-1', name: 'Guard One', protocol: 'openai_compatible', base_url: 'http://127.0.0.1:8000',
@@ -67,7 +71,7 @@ describe('Prompt Audit components', () => {
 
   it('supports group search, stale configured groups, nine scanners, and bounded worker inputs', async () => {
     const draft: PromptAuditDraft = {
-      enabled: true, blocking_enabled: false, blocking_latest_turn_only: false, store_pass_events: false, effective_mode: 'async_audit', strategy: 'priority',
+      enabled: true, record_only: false, blocking_enabled: false, blocking_latest_turn_only: false, store_pass_events: false, effective_mode: 'async_audit', strategy: 'priority',
       worker_count: 4, queue_capacity: 100, scanners: SCANNER_CATALOG.map((item) => item.id), all_groups: false, group_ids: [1, 99],
       endpoints: [endpoint()], config_version: 1, updated_at: '', updated_by: 0, change_summary: '',
     }
@@ -87,7 +91,7 @@ describe('Prompt Audit components', () => {
   it('keeps identity fields separate, supports selection, and opens filter deletion from the toolbar', async () => {
     const event: PromptAuditEvent = {
       id: 1, job_id: 1, decision: 'critical', risk_level: 'critical', action: 'Block', categories: ['pii'], matched_scanners: ['pii'], scanner_scores: { pii: 1 }, scanner_evidence: { pii: 'redacted' }, scanner_backend: 'qwen3guard-openai', scanner_version: '1', guard_endpoint_id: 'guard-1', policy_id: 'priority', policy_version: 1, config_version: 1, chunk_total: 1, latency_ms: 10, issue_summaries: [], created_at: '2026-07-16T00:00:00Z',
-      snapshot: { request_id: 'req-1', user_id: 1, username: 'alice', user_email: 'alice@example.test', api_key_id: 2, api_key_name: 'alice-key', group_id: 3, group_name: 'Alpha', provider: 'openai', endpoint: '/v1/chat/completions', protocol: 'openai_chat', model: 'gpt-test', prompt_hash: 'a'.repeat(64), redacted_preview: 'redacted preview', full_prompt: 'full prompt text', prompt_length: 10, message_count: 1, stage: 'http' },
+      snapshot: { request_id: 'req-1', user_id: 1, username: 'alice', user_email: 'alice@example.test', api_key_id: 2, api_key_name: 'alice-key', group_id: 3, group_name: 'Alpha', provider: 'openai', endpoint: '/v1/chat/completions', protocol: 'openai_chat', model: 'gpt-test', prompt_hash: 'a'.repeat(64), redacted_preview: 'redacted preview', request_excerpt: 'show this unmasked latest input', full_prompt: 'full prompt text', prompt_length: 10, message_count: 1, stage: 'http' },
     }
     const wrapper = mount(EventWorkspace, {
       props: { events: [event], total: 1, page: 1, pageSize: 20, filters: emptyEventFilters(), selectedIds: [], loading: false, error: '' },
@@ -98,11 +102,44 @@ describe('Prompt Audit components', () => {
     expect(wrapper.text()).toContain('alice-key')
     expect(wrapper.text()).toContain('admin.promptAudit.decisions.critical · admin.promptAudit.riskLevels.critical')
     expect(wrapper.text()).toContain('admin.promptAudit.scanners.pii')
+    expect(wrapper.text()).not.toContain('redacted preview')
+    expect(wrapper.text()).toContain('show this unmasked latest input')
+    expect(wrapper.text()).toContain('admin.promptAudit.events.totalCount')
+    expect(wrapper.find('[data-test="pagination"]').exists()).toBe(true)
     expect(wrapper.get('[data-test="filter-delete"]').attributes()).not.toHaveProperty('disabled')
     await wrapper.get('[data-test="filter-delete"]').trigger('click')
     expect(wrapper.emitted('preview-delete')).toHaveLength(1)
     await wrapper.get('[aria-label="admin.promptAudit.events.selectEvent"]').setValue(true)
     expect(wrapper.emitted('selection')?.at(-1)?.[0]).toEqual([1])
+    const searchesBeforeRefresh = wrapper.emitted('search')?.length ?? 0
+    const refresh = wrapper.findAll('button').find((button) => button.text().includes('admin.promptAudit.events.refresh'))
+    await refresh!.trigger('click')
+    expect(wrapper.emitted('search')).toHaveLength(searchesBeforeRefresh + 1)
+    const tableScroll = wrapper.get('[data-test="event-table-scroll"]')
+    const scrollTo = vi.fn()
+    Object.defineProperty(tableScroll.element, 'scrollTo', { value: scrollTo, configurable: true })
+    await wrapper.get('[data-test="page-next"]').trigger('click')
+    expect(wrapper.emitted('page')?.at(-1)?.[0]).toBe(2)
+    expect(scrollTo).toHaveBeenCalledWith({ top: 0, behavior: 'auto' })
+    await wrapper.get('[data-test="page-size"]').trigger('click')
+    expect(wrapper.emitted('page-size')?.at(-1)?.[0]).toBe(100)
+    expect(scrollTo).toHaveBeenCalledTimes(2)
+  })
+
+  it('labels record-only rows without implying a safety decision', () => {
+    const event: PromptAuditEvent = {
+      id: 2, job_id: 2, decision: 'pass', risk_level: 'low', action: 'Allow', categories: [], matched_scanners: [], scanner_scores: {}, scanner_evidence: {}, scanner_backend: 'record-only', scanner_version: '1', guard_endpoint_id: '', policy_id: 'record-only', policy_version: 1, config_version: 2, chunk_total: 0, latency_ms: 0, issue_summaries: [], created_at: '2026-07-16T00:00:00Z',
+      snapshot: { request_id: 'req-2', user_id: 9, username: '', user_email: 'caller@example.test', api_key_id: 5, api_key_name: 'ccmax', group_id: 7, group_name: 'ClaudeCode-Max', provider: 'anthropic', endpoint: '/v1/messages', protocol: 'anthropic_messages', model: 'claude-opus-4-6', prompt_hash: 'b'.repeat(64), redacted_preview: 'must stay hidden', full_prompt: '', prompt_length: 20, message_count: 2, stage: 'http' },
+    }
+    const wrapper = mount(EventWorkspace, {
+      props: { events: [event], total: 1, page: 1, pageSize: 20, filters: emptyEventFilters(), selectedIds: [], loading: false, error: '' },
+      global: { stubs: { Pagination: PaginationStub } },
+    })
+    const rowText = wrapper.get('[data-test="event-2"]').text()
+    expect(rowText).toContain('admin.promptAudit.events.recorded')
+    expect(rowText).toContain('admin.promptAudit.events.noGuardCall')
+    expect(rowText).not.toContain('admin.promptAudit.decisions.pass')
+    expect(rowText).not.toContain('must stay hidden')
   })
 
   it('resolves delete range presets to an epoch start and a cutoff end', () => {

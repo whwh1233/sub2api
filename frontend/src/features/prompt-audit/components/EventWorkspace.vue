@@ -2,10 +2,18 @@
   <section aria-labelledby="prompt-events-title" class="py-6">
     <div class="flex flex-wrap items-start justify-between gap-3">
       <div>
-        <h2 id="prompt-events-title" class="text-base font-semibold text-gray-950 dark:text-white">{{ t('admin.promptAudit.events.title') }}</h2>
+        <div class="flex flex-wrap items-center gap-2.5">
+          <h2 id="prompt-events-title" class="text-base font-semibold text-gray-950 dark:text-white">{{ t('admin.promptAudit.events.title') }}</h2>
+          <span class="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium tabular-nums text-gray-600 dark:bg-dark-800 dark:text-dark-300">
+            {{ t('admin.promptAudit.events.totalCount', { count: total }) }}
+          </span>
+        </div>
         <p class="mt-1 text-sm text-gray-500 dark:text-dark-300">{{ t('admin.promptAudit.events.description') }}</p>
       </div>
       <div class="flex flex-wrap gap-2">
+        <button type="button" class="btn btn-secondary btn-sm" :disabled="loading" @click="applyFilters">
+          {{ loading ? t('admin.promptAudit.events.refreshing') : t('admin.promptAudit.events.refresh') }}
+        </button>
         <button type="button" class="btn btn-secondary btn-sm" :disabled="selectedIds.length === 0" @click="$emit('batch-delete')">
           {{ t('admin.promptAudit.events.deleteSelected', { count: selectedIds.length }) }}
         </button>
@@ -56,55 +64,82 @@
       </div>
     </form>
     <div v-if="error" role="alert" class="mt-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700 dark:bg-red-950/30 dark:text-red-300">{{ error }}</div>
-    <div class="mt-5 overflow-x-auto rounded-xl border border-gray-200 dark:border-dark-700/60">
-      <table class="min-w-[1120px] w-full text-left text-sm">
-        <thead class="bg-gray-50 text-xs uppercase tracking-wide text-gray-500 dark:bg-dark-900/70 dark:text-dark-400">
+    <div class="mt-5 flex flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm shadow-gray-100/60 dark:border-dark-700/60 dark:bg-transparent dark:shadow-none lg:h-[70dvh] lg:min-h-[30rem] lg:max-h-[52rem]">
+      <div ref="tableScrollRef" class="min-h-0 flex-1 overflow-auto" data-test="event-table-scroll">
+        <table class="min-w-[1320px] w-full table-fixed text-left text-sm" data-test="event-table">
+        <thead class="sticky top-0 z-10 border-b border-gray-200 bg-gray-50 text-xs text-gray-500 shadow-[0_1px_0_rgba(229,231,235,1)] dark:border-dark-700 dark:bg-dark-900 dark:text-dark-400 dark:shadow-[0_1px_0_rgba(55,65,81,1)]">
           <tr>
             <th class="w-10 px-3 py-3"><input type="checkbox" :checked="allSelected" :aria-label="t('admin.promptAudit.events.selectAll')" @change="toggleAll" /></th>
-            <th class="px-3 py-3 font-medium">{{ t('admin.promptAudit.events.time') }}</th>
-            <th class="px-3 py-3 font-medium">{{ t('admin.promptAudit.events.identity') }}</th>
-            <th class="px-3 py-3 font-medium">{{ t('admin.promptAudit.events.group') }}</th>
-            <th class="px-3 py-3 font-medium">{{ t('admin.promptAudit.events.route') }}</th>
-            <th class="px-3 py-3 font-medium">{{ t('admin.promptAudit.events.result') }}</th>
-            <th class="px-3 py-3 font-medium">{{ t('admin.promptAudit.events.preview') }}</th>
-            <th class="px-3 py-3 text-right font-medium">{{ t('admin.promptAudit.common.actions') }}</th>
+            <th class="w-36 px-4 py-3 font-medium">{{ t('admin.promptAudit.events.time') }}</th>
+            <th class="w-64 px-4 py-3 font-medium">{{ t('admin.promptAudit.events.identity') }}</th>
+            <th class="w-80 px-4 py-3 font-medium">{{ t('admin.promptAudit.events.latestInput') }}</th>
+            <th class="px-4 py-3 font-medium">{{ t('admin.promptAudit.events.requestRoute') }}</th>
+            <th class="w-40 px-4 py-3 font-medium">{{ t('admin.promptAudit.events.result') }}</th>
+            <th class="w-40 px-4 py-3 text-right font-medium">{{ t('admin.promptAudit.common.actions') }}</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-gray-100 bg-white dark:divide-dark-700 dark:bg-transparent">
-          <tr v-if="loading"><td colspan="8" class="px-4 py-12 text-center text-gray-500" aria-busy="true">{{ t('common.loading') }}</td></tr>
-          <tr v-else-if="events.length === 0"><td colspan="8" class="px-4 py-12 text-center text-gray-500">{{ t('admin.promptAudit.events.empty') }}</td></tr>
-          <tr v-for="event in events" v-else :key="event.id" :data-test="`event-${event.id}`" class="align-top hover:bg-gray-50/70 dark:hover:bg-dark-800/70">
-            <td class="px-3 py-3"><input type="checkbox" :checked="selectedIds.includes(event.id)" :aria-label="t('admin.promptAudit.events.selectEvent', { id: event.id })" @change="toggleOne(event.id)" /></td>
-            <td class="whitespace-nowrap px-3 py-3 text-xs text-gray-600 dark:text-dark-300">{{ formatDate(event.created_at) }}</td>
-            <td class="px-3 py-3">
-              <CopyLine :label="t('admin.promptAudit.events.user')" :value="event.snapshot.username" />
-              <CopyLine :label="t('admin.promptAudit.events.email')" :value="event.snapshot.user_email" />
-              <CopyLine :label="t('admin.promptAudit.events.apiKey')" :value="event.snapshot.api_key_name" />
+          <tr v-if="loading"><td colspan="7" class="px-4 py-12 text-center text-gray-500" aria-busy="true">{{ t('common.loading') }}</td></tr>
+          <tr v-else-if="events.length === 0"><td colspan="7" class="px-4 py-12 text-center text-gray-500">{{ t('admin.promptAudit.events.empty') }}</td></tr>
+          <tr
+            v-for="event in events"
+            v-else
+            :key="event.id"
+            :data-test="`event-${event.id}`"
+            :aria-selected="selectedIds.includes(event.id)"
+            class="group align-middle transition-colors duration-150 hover:bg-gray-50/80 aria-selected:bg-primary-50/50 dark:hover:bg-dark-800/70 dark:aria-selected:bg-primary-950/20"
+          >
+            <td class="px-3 py-4"><input type="checkbox" :checked="selectedIds.includes(event.id)" :aria-label="t('admin.promptAudit.events.selectEvent', { id: event.id })" @change="toggleOne(event.id)" /></td>
+            <td class="px-4 py-4">
+              <p class="whitespace-nowrap font-medium tabular-nums text-gray-800 dark:text-dark-100">{{ formatTime(event.created_at) }}</p>
+              <p class="mt-1 whitespace-nowrap text-xs tabular-nums text-gray-500 dark:text-dark-400">{{ formatDay(event.created_at) }} · #{{ event.id }}</p>
             </td>
-            <td class="px-3 py-3 text-gray-700 dark:text-dark-200">{{ event.snapshot.group_name || '—' }}</td>
-            <td class="px-3 py-3">
-              <p class="font-medium text-gray-900 dark:text-white">{{ event.snapshot.endpoint }}</p>
-              <p class="mt-1 text-xs text-gray-500">{{ event.snapshot.model }} · {{ event.snapshot.protocol }} · {{ event.snapshot.stage || 'http' }}</p>
+            <td class="px-4 py-4">
+              <p class="truncate font-medium text-gray-900 dark:text-white" :title="identityTitle(event)">{{ identityTitle(event) }}</p>
+              <p v-if="identitySubtitle(event)" class="mt-1 truncate text-xs text-gray-500 dark:text-dark-400" :title="identitySubtitle(event)">{{ identitySubtitle(event) }}</p>
+              <div class="mt-2 flex flex-wrap items-center gap-1.5">
+                <span class="max-w-40 truncate rounded-md bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600 dark:bg-dark-800 dark:text-dark-300" :title="event.snapshot.api_key_name || ''">
+                  {{ event.snapshot.api_key_name || t('admin.promptAudit.events.unknownApiKey') }}
+                </span>
+                <span v-if="event.snapshot.user_id" class="text-[11px] tabular-nums text-gray-400 dark:text-dark-500">UID {{ event.snapshot.user_id }}</span>
+              </div>
             </td>
-            <td class="px-3 py-3">
-              <span class="rounded-full px-2 py-0.5 text-xs font-medium" :class="decisionClass(event.decision)">{{ formatDecisionRisk(event.decision, event.risk_level) }}</span>
-              <p class="mt-2 max-w-48 truncate text-xs text-gray-500" :title="formatCategories(event.categories)">{{ formatCategories(event.categories) }}</p>
+            <td class="px-4 py-4 align-top">
+              <p class="line-clamp-3 whitespace-pre-wrap break-words font-medium leading-5 text-gray-800 dark:text-dark-100" :title="event.snapshot.request_excerpt || ''">
+                {{ event.snapshot.request_excerpt || t('admin.promptAudit.events.noInputExcerpt') }}
+              </p>
+              <p class="mt-2 font-mono text-[11px] text-gray-400 dark:text-dark-500">{{ shortHash(event.snapshot.prompt_hash) }}</p>
             </td>
-            <td class="max-w-xs px-3 py-3"><p class="line-clamp-2 break-words text-gray-600 dark:text-dark-300">{{ event.snapshot.redacted_preview || '—' }}</p></td>
-            <td class="whitespace-nowrap px-3 py-3 text-right">
-              <button type="button" class="btn btn-ghost btn-sm" @click="$emit('view', event.id)">{{ t('common.view') }}</button>
-              <button type="button" class="btn btn-ghost btn-sm text-red-600" @click="$emit('delete', event.id)">{{ t('common.delete') }}</button>
+            <td class="px-4 py-4">
+              <div class="flex min-w-0 items-center gap-2">
+                <p class="truncate font-semibold text-gray-900 dark:text-white" :title="event.snapshot.model">{{ event.snapshot.model || '—' }}</p>
+                <span class="flex-none rounded-md border border-gray-200 bg-gray-50 px-1.5 py-0.5 text-[11px] font-medium text-gray-500 dark:border-dark-700 dark:bg-dark-900 dark:text-dark-400">
+                  {{ event.snapshot.provider || '—' }}
+                </span>
+              </div>
+              <p class="mt-1 truncate text-xs text-gray-500 dark:text-dark-400" :title="routeMeta(event)">{{ routeMeta(event) }}</p>
+              <p class="mt-2 truncate text-xs font-medium text-gray-700 dark:text-dark-200" :title="event.snapshot.group_name || ''">{{ event.snapshot.group_name || '—' }}</p>
+            </td>
+            <td class="px-4 py-4">
+              <span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold" :class="resultClass(event)">{{ resultLabel(event) }}</span>
+              <p v-if="!isRecordOnly(event)" class="mt-2 truncate text-xs text-gray-500 dark:text-dark-400" :title="formatCategories(event.categories)">{{ formatCategories(event.categories) }}</p>
+              <p v-else class="mt-2 text-xs text-gray-400 dark:text-dark-500">{{ t('admin.promptAudit.events.noGuardCall') }}</p>
+            </td>
+            <td class="whitespace-nowrap px-4 py-4 text-right">
+              <button type="button" class="inline-flex min-h-9 items-center rounded-lg border border-primary-200 bg-white px-3 py-1.5 text-sm font-medium text-primary-700 transition-colors hover:border-primary-300 hover:bg-primary-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:border-primary-800 dark:bg-dark-900 dark:text-primary-300 dark:hover:bg-primary-950/40" @click="$emit('view', event.id)">{{ t('common.view') }}</button>
+              <button type="button" class="ml-1 inline-flex min-h-9 items-center rounded-lg px-2.5 py-1.5 text-sm text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2 dark:hover:bg-red-950/30 dark:hover:text-red-300" @click="$emit('delete', event.id)">{{ t('common.delete') }}</button>
             </td>
           </tr>
         </tbody>
-      </table>
-      <Pagination :total="total" :page="page" :page-size="pageSize" @update:page="$emit('page', $event)" @update:page-size="$emit('page-size', $event)" />
+        </table>
+      </div>
+      <Pagination class="flex-none" :total="total" :page="page" :page-size="pageSize" @update:page="handlePageChange" @update:page-size="handlePageSizeChange" />
     </div>
   </section>
 </template>
 
 <script setup lang="ts">
-import { computed, defineComponent, h, reactive, watch } from 'vue'
+import { computed, defineComponent, h, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Pagination from '@/components/common/Pagination.vue'
 import type { PromptAuditEvent, PromptEventFilters } from '../types'
@@ -127,6 +162,7 @@ const emit = defineEmits<{
 }>()
 const { t, locale } = useI18n()
 const localFilters = reactive<PromptEventFilters>(cloneData(props.filters))
+const tableScrollRef = ref<HTMLElement | null>(null)
 watch(() => props.filters, (value) => Object.assign(localFilters, cloneData(value)), { deep: true })
 const allSelected = computed(() => props.events.length > 0 && props.events.every((event) => props.selectedIds.includes(event.id)))
 
@@ -145,24 +181,11 @@ const FilterInput = defineComponent({
   },
 })
 
-const CopyLine = defineComponent({
-  props: { label: { type: String, required: true }, value: { type: String, default: '' } },
-  setup(componentProps) {
-    return () => h('div', { class: 'flex max-w-56 items-center gap-1 text-xs' }, [
-      h('span', { class: 'w-16 flex-none text-gray-500 dark:text-dark-400' }, componentProps.label),
-      h('span', { class: 'min-w-0 flex-1 truncate text-gray-800 dark:text-dark-100' }, componentProps.value || '—'),
-      componentProps.value ? h('button', {
-        type: 'button', class: 'text-primary-600 hover:underline', 'aria-label': `${t('common.copy')} ${componentProps.label}`,
-        onClick: () => navigator.clipboard?.writeText(componentProps.value),
-      }, t('common.copy')) : null,
-    ])
-  },
-})
-
 function filtersChanged() {
   emit('filters-change', cloneData(localFilters))
 }
 function applyFilters() {
+  resetTableScroll()
   const value = cloneData(localFilters)
   emit('filters-change', value)
   emit('search', value)
@@ -180,13 +203,48 @@ function toggleOne(id: number) {
 function toggleAll() {
   emit('selection', allSelected.value ? [] : props.events.map((event) => event.id))
 }
-function formatDate(value: string): string {
-  return new Intl.DateTimeFormat(locale.value, { dateStyle: 'short', timeStyle: 'medium' }).format(new Date(value))
+function resetTableScroll() {
+  tableScrollRef.value?.scrollTo?.({ top: 0, behavior: 'auto' })
 }
-function decisionClass(decision: string): string {
-  if (decision === 'critical') return 'bg-red-100 text-red-700 dark:bg-red-950/50 dark:text-red-300'
-  if (decision === 'flag') return 'bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300'
+function handlePageChange(nextPage: number) {
+  resetTableScroll()
+  emit('page', nextPage)
+}
+function handlePageSizeChange(nextPageSize: number) {
+  resetTableScroll()
+  emit('page-size', nextPageSize)
+}
+function formatTime(value: string): string {
+  return new Intl.DateTimeFormat(locale.value, { hour: '2-digit', minute: '2-digit', second: '2-digit' }).format(new Date(value))
+}
+function formatDay(value: string): string {
+  return new Intl.DateTimeFormat(locale.value, { year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(value))
+}
+function identityTitle(event: PromptAuditEvent): string {
+  return event.snapshot.username || event.snapshot.user_email || (event.snapshot.user_id ? `User #${event.snapshot.user_id}` : '—')
+}
+function identitySubtitle(event: PromptAuditEvent): string {
+  if (!event.snapshot.user_email || event.snapshot.user_email === event.snapshot.username) return ''
+  return event.snapshot.user_email
+}
+function routeMeta(event: PromptAuditEvent): string {
+  return [event.snapshot.endpoint, event.snapshot.protocol, event.snapshot.stage || 'http'].filter(Boolean).join(' · ')
+}
+function shortHash(value: string): string {
+  if (!value) return '—'
+  return `${value.slice(0, 8)}…`
+}
+function isRecordOnly(event: PromptAuditEvent): boolean {
+  return event.scanner_backend === 'record-only'
+}
+function resultClass(event: PromptAuditEvent): string {
+  if (isRecordOnly(event)) return 'bg-sky-100 text-sky-700 dark:bg-sky-950/50 dark:text-sky-300'
+  if (event.decision === 'critical') return 'bg-red-100 text-red-700 dark:bg-red-950/50 dark:text-red-300'
+  if (event.decision === 'flag') return 'bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300'
   return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300'
+}
+function resultLabel(event: PromptAuditEvent): string {
+  return isRecordOnly(event) ? t('admin.promptAudit.events.recorded') : formatDecisionRisk(event.decision, event.risk_level)
 }
 const DECISIONS = new Set(['pass', 'flag', 'critical'])
 const RISK_LEVELS = new Set(['low', 'medium', 'high', 'critical'])

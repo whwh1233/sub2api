@@ -1,5 +1,5 @@
 <template>
-  <div :class="flat ? '' : 'card overflow-hidden'">
+  <div :class="['flex min-h-0 flex-col', flat ? '' : 'card overflow-hidden']">
     <div
       v-if="showIpGeoToolbar"
       class="flex items-center justify-end gap-2 border-b border-gray-200 px-4 py-2 dark:border-dark-700"
@@ -16,8 +16,9 @@
         {{ ipGeoBatchLoading ? t('usage.ipGeo.batchFetching') : t('usage.ipGeo.batchFetch') }}
       </button>
     </div>
-    <div class="overflow-auto">
+    <div class="flex min-h-0 flex-1 flex-col overflow-hidden">
       <DataTable
+        class="min-h-0 flex-1 overscroll-contain"
         :columns="columns"
         :data="data"
         :loading="loading"

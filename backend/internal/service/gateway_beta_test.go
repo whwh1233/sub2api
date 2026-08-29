@@ -131,6 +131,7 @@ func TestFullClaudeCodeMimicryBetas_DoesNotDefaultRedactThinking(t *testing.T) {
 	require.Contains(t, required, claude.BetaClaudeCode)
 	require.Contains(t, required, claude.BetaOAuth)
 	require.Contains(t, required, claude.BetaInterleavedThinking)
+	require.Contains(t, required, claude.BetaPromptCachingEvict)
 }
 
 func TestMergeAnthropicBetaDropping_PreservesIncomingRedactThinking(t *testing.T) {

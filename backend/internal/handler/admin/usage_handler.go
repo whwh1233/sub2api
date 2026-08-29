@@ -153,10 +153,15 @@ func (h *UsageHandler) List(c *gin.Context) {
 		upstreamModelMismatch = &value
 	}
 
-	// Parse date range
+	// Parse date range. Exact RFC3339 timestamps take precedence when supplied.
 	var startTime, endTime *time.Time
 	userTZ := c.Query("timezone") // Get user's timezone from request
-	if startDateStr := c.Query("start_date"); startDateStr != "" {
+	if exactStart, ok, err := parseExactTimeQuery(c, "start_time"); err != nil {
+		response.BadRequest(c, "Invalid start_time format, use RFC3339")
+		return
+	} else if ok {
+		startTime = &exactStart
+	} else if startDateStr := c.Query("start_date"); startDateStr != "" {
 		t, err := timezone.ParseInUserLocation("2006-01-02", startDateStr, userTZ)
 		if err != nil {
 			response.BadRequest(c, "Invalid start_date format, use YYYY-MM-DD")
@@ -165,7 +170,12 @@ func (h *UsageHandler) List(c *gin.Context) {
 		startTime = &t
 	}
 
-	if endDateStr := c.Query("end_date"); endDateStr != "" {
+	if exactEnd, ok, err := parseExactTimeQuery(c, "end_time"); err != nil {
+		response.BadRequest(c, "Invalid end_time format, use RFC3339")
+		return
+	} else if ok {
+		endTime = &exactEnd
+	} else if endDateStr := c.Query("end_date"); endDateStr != "" {
 		t, err := timezone.ParseInUserLocation("2006-01-02", endDateStr, userTZ)
 		if err != nil {
 			response.BadRequest(c, "Invalid end_date format, use YYYY-MM-DD")
@@ -332,6 +342,19 @@ func (h *UsageHandler) Stats(c *gin.Context) {
 			startTime = timezone.StartOfDayInUserLocation(now, userTZ)
 		}
 		endTime = now
+	}
+
+	if exactStart, ok, err := parseExactTimeQuery(c, "start_time"); err != nil {
+		response.BadRequest(c, "Invalid start_time format, use RFC3339")
+		return
+	} else if ok {
+		startTime = exactStart
+	}
+	if exactEnd, ok, err := parseExactTimeQuery(c, "end_time"); err != nil {
+		response.BadRequest(c, "Invalid end_time format, use RFC3339")
+		return
+	} else if ok {
+		endTime = exactEnd
 	}
 
 	// Build filters and call GetStatsWithFilters

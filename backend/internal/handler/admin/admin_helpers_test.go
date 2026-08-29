@@ -30,6 +30,13 @@ func TestParseTimeRange(t *testing.T) {
 	start, end = parseTimeRange(c)
 	require.False(t, start.IsZero())
 	require.False(t, end.IsZero())
+
+	req = httptest.NewRequest(http.MethodGet, "/?start_date=2024-01-01&end_date=2024-01-02&start_time=2024-01-01T10:11:12Z&end_time=2024-01-01T12:13:14Z", nil)
+	exactContext, _ := gin.CreateTestContext(httptest.NewRecorder())
+	exactContext.Request = req
+	start, end = parseTimeRange(exactContext)
+	require.Equal(t, time.Date(2024, 1, 1, 10, 11, 12, 0, time.UTC), start)
+	require.Equal(t, time.Date(2024, 1, 1, 12, 13, 14, 0, time.UTC), end)
 }
 
 func TestParseOpsViewParam(t *testing.T) {

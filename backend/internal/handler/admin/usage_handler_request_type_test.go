@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/pagination"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/usagestats"
@@ -119,6 +120,32 @@ func TestAdminUsageListRequestIDFilter(t *testing.T) {
 	require.Equal(t, "req-0123", repo.listFilters.RequestID)
 }
 
+func TestAdminUsageListExactTimeRangeTakesPriority(t *testing.T) {
+	repo := &adminUsageRepoCapture{}
+	router := newAdminUsageRequestTypeTestRouter(repo)
+
+	req := httptest.NewRequest(http.MethodGet, "/admin/usage?start_date=2026-08-01&end_date=2026-08-31&start_time=2026-08-29T05:37:55Z&end_time=2026-08-29T07:19:26Z", nil)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusOK, rec.Code)
+	require.NotNil(t, repo.listFilters.StartTime)
+	require.NotNil(t, repo.listFilters.EndTime)
+	require.Equal(t, time.Date(2026, 8, 29, 5, 37, 55, 0, time.UTC), *repo.listFilters.StartTime)
+	require.Equal(t, time.Date(2026, 8, 29, 7, 19, 26, 0, time.UTC), *repo.listFilters.EndTime)
+}
+
+func TestAdminUsageListRejectsInvalidExactTime(t *testing.T) {
+	repo := &adminUsageRepoCapture{}
+	router := newAdminUsageRequestTypeTestRouter(repo)
+
+	req := httptest.NewRequest(http.MethodGet, "/admin/usage?start_time=not-a-time", nil)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusBadRequest, rec.Code)
+}
+
 func TestAdminUsageListInvalidExactTotal(t *testing.T) {
 	repo := &adminUsageRepoCapture{}
 	router := newAdminUsageRequestTypeTestRouter(repo)
@@ -155,6 +182,21 @@ func TestAdminUsageStatsUsesRequestedModelForDisplayModelFilter(t *testing.T) {
 	require.Equal(t, http.StatusOK, rec.Code)
 	require.Equal(t, "grok-imagine-video-1.5", repo.statsFilters.Model)
 	require.Equal(t, usagestats.ModelSourceRequested, repo.statsFilters.ModelFilterSource)
+}
+
+func TestAdminUsageStatsExactTimeRangeTakesPriority(t *testing.T) {
+	repo := &adminUsageRepoCapture{}
+	router := newAdminUsageRequestTypeTestRouter(repo)
+
+	req := httptest.NewRequest(http.MethodGet, "/admin/usage/stats?start_date=2026-08-01&end_date=2026-08-31&start_time=2026-08-29T05:37:55Z&end_time=2026-08-29T07:19:26Z", nil)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusOK, rec.Code)
+	require.NotNil(t, repo.statsFilters.StartTime)
+	require.NotNil(t, repo.statsFilters.EndTime)
+	require.Equal(t, time.Date(2026, 8, 29, 5, 37, 55, 0, time.UTC), *repo.statsFilters.StartTime)
+	require.Equal(t, time.Date(2026, 8, 29, 7, 19, 26, 0, time.UTC), *repo.statsFilters.EndTime)
 }
 
 func TestAdminUsageStatsInvalidRequestType(t *testing.T) {

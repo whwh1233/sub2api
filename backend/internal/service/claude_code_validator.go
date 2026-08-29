@@ -219,7 +219,7 @@ var claudeCodeSecurityMonitorMarkers = []string{
 }
 
 // isClaudeCodeSecurityMonitorPrompt 识别 Claude Code auto 模式安全监视器分类器请求。
-// 真实 CLI（实测 2.1.220）会在监视器提示词之外追加独立的会话上下文 system 块，
+// 真实 CLI（实测 2.1.241）会在监视器提示词之外追加独立的会话上下文 system 块，
 // entry 数量不受服务端控制，故逐 entry 查找匹配项而非限定恰好一个 entry。
 func isClaudeCodeSecurityMonitorPrompt(systemEntries []any) bool {
 	for _, raw := range systemEntries {
