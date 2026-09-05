@@ -1,5 +1,9 @@
 # Agent Operating Rules
 
+## Windows Development Storage
+
+Keep build caches, dependency downloads, temporary files, logs, and validation artifacts on D: on this workstation. Before Windows builds or tests, run `& .\deploy\local-dev-environment.ps1` to configure Go caches, Go dependencies, lint cache, and process-local TEMP/TMP under `D:\codex\.cache`. The release and database-sync scripts call this helper automatically. Do not change the Windows system TEMP/TMP directories or revert development caches to C:.
+
 ## Required Upgrade Runbook
 
 Before planning or executing any `sub2api` upgrade, production database sync,

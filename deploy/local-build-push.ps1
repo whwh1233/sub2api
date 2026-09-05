@@ -9,6 +9,8 @@ param()
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
+& (Join-Path $PSScriptRoot 'local-dev-environment.ps1')
+
 $RepoRoot = Resolve-Path (Join-Path $PSScriptRoot '..')
 $BackendDir = Join-Path $RepoRoot 'backend'
 $FrontendDir = Join-Path $RepoRoot 'frontend'

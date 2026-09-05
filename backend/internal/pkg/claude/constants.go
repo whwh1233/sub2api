@@ -75,10 +75,11 @@ const APIKeyHaikuBetaHeader = BetaInterleavedThinking
 // 客户端缺省时统一使用 5m"，这样既不浪费 1h 缓存额度，也保留客户端自定义能力。
 const DefaultCacheControlTTL = "5m"
 
-// CLICurrentVersion 是 sub2api 当前对外伪装的 Claude Code CLI 版本号（三段 semver）。
+// CLICurrentVersion 是内置的 Claude Code CLI 伪装版本号基线（三段 semver）。
 // 用于 billing attribution block 中的 cc_version=X.Y.Z.{fp} 前缀以及 fingerprint 计算。
 // 必须与 DefaultHeaders["User-Agent"] 中的版本号严格一致；不一致会被 Anthropic 判第三方。
 //
+// 运行时通过 CLIVersion() 读取版本，以应用 SUB2API_CLAUDE_CLI_VERSION 覆盖。
 // 对齐本机官方 CLI：@anthropic-ai/claude-code@2.1.241（BUILD_TIME 2026-08-22T22:46:48Z）。
 const CLICurrentVersion = "2.1.241"
 
@@ -118,7 +119,7 @@ var DefaultHeaders = map[string]string{
 	// Keep these in sync with recent Claude CLI traffic to reduce the chance
 	// that Claude Code-scoped OAuth credentials are rejected as "non-CLI" usage.
 	// UA 对齐 2.1.241 sLe()：`claude-cli/${VERSION} (external, ${ENTRYPOINT??"cli"})`
-	"User-Agent":                                "claude-cli/" + CLICurrentVersion + " (external, cli)",
+	"User-Agent":                                "claude-cli/" + CLIVersion() + " (external, cli)",
 	"X-Stainless-Lang":                          "js",
 	"X-Stainless-Package-Version":               CLIStainlessPackageVersion,
 	"X-Stainless-OS":                            "Linux",

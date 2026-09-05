@@ -103,6 +103,13 @@ Never declare validation complete from `/health` alone.
 
 ## 5. Official build and compressed artifact
 
+On the Windows workstation, development caches and temporary files must stay on
+D: (user instruction, 2026-09-06). Run `& .\deploy\local-dev-environment.ps1`
+before manual tests; the Windows build and local database-sync scripts call it
+automatically. It uses `D:\codex\.cache` on this checkout's drive for Go build and
+module caches, GOPATH, lint cache, and process-local TEMP/TMP. System TEMP/TMP
+settings remain unchanged. Existing cache files on C: are not deleted by this helper.
+
 Run only from the repository root. Use the entry point for the current OS:
 
 ```powershell
