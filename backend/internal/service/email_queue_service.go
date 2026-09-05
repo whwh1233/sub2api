@@ -47,7 +47,7 @@ func NewEmailQueueService(emailService *EmailService, workers int) *EmailQueueSe
 	}
 
 	// 启动工作协程
-	service.start()
+	startBackgroundWorker(service.start)
 
 	return service
 }

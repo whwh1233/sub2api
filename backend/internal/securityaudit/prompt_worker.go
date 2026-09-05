@@ -6,6 +6,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/Wei-Shaw/sub2api/internal/config"
 )
 
 type WorkerRuntime struct {
@@ -40,6 +42,9 @@ func NewRunner(config ConfigStore, repo JobRepository, payload PayloadStore, sca
 func (r *Runner) Start(ctx context.Context) error {
 	if r == nil || r.config == nil || r.repo == nil || r.payload == nil || r.scanner == nil {
 		return errors.New("prompt audit worker dependencies unavailable")
+	}
+	if config.BackgroundWorkersDisabled() {
+		return nil
 	}
 	r.mu.Lock()
 	if r.cancel != nil {

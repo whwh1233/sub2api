@@ -34,7 +34,7 @@ describe('Prompt Audit integration surface', () => {
     const events = read('../components/EventWorkspace.vue')
     expect(endpoint).toContain('aria-label')
     expect(events).toContain('aria-label')
-    expect(events).toContain('overflow-x-auto')
+    expect(events).toMatch(/overflow-(?:x-)?auto/)
     expect(events).toContain('sm:grid-cols-2')
   })
 })

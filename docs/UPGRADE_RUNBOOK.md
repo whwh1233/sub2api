@@ -58,6 +58,12 @@ do not silently bypass the repository-required sync script.
 4. Start the candidate with background workers disabled.
 5. Verify database size, public table count, and `schema_migrations`.
 
+Set `SERVER_DISABLE_BACKGROUND_WORKERS=true` for the local candidate and verify
+the startup log contains `Background workers disabled for local validation`.
+The application must honor this flag; setting an unused environment variable is
+not sufficient. In this mode, scheduled providers and plugin runtimes stay off;
+prompt audit loads its configuration for admin inspection without consuming jobs.
+
 `schema_migrations` columns are `filename`, `checksum`, and `applied_at`; there is
 no `version` column. “Migrated to 173” means migration file
 `173_allow_cyber_blocked_usage_request_type.sql` was applied. It does not mean
@@ -231,3 +237,6 @@ old-process shutdown record from a new-process startup failure.
   private key; use its configured public HTTPS origin.
 - SCP lanes exit 255 at sixteen-way concurrency: return to eight staggered lanes.
 - `schema_migrations.version does not exist`: query `filename` and `applied_at`.
+- A release tag can contain stale embedded version metadata. The upstream
+  `v0.2.0` tag still contained `0.1.185` in `backend/cmd/server/VERSION`; align this
+  file with the selected release before packaging and verify the candidate's version.

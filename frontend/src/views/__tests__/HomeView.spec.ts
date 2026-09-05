@@ -1,5 +1,6 @@
 import { describe, expect, it, beforeEach, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
+import { createPinia, setActivePinia } from 'pinia'
 
 import HomeView from '../HomeView.vue'
 
@@ -81,6 +82,7 @@ vi.mock('@/stores', () => ({
 
 describe('HomeView default marketing copy', () => {
   beforeEach(() => {
+    setActivePinia(createPinia())
     checkAuth.mockReset()
     fetchPublicSettings.mockReset()
     toggleTheme.mockReset()

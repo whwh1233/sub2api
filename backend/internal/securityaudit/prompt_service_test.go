@@ -35,6 +35,22 @@ func (r staticSettingRepository) GetAll(context.Context) (map[string]string, err
 }
 func (r staticSettingRepository) Delete(context.Context, string) error { return nil }
 
+func TestPromptServiceValidationLoadsConfigWithoutWorkers(t *testing.T) {
+	t.Setenv("SERVER_DISABLE_BACKGROUND_WORKERS", "true")
+	manager := NewConfigManager(nil, staticSettingRepository{values: map[string]string{
+		SettingKeyPromptAuditConfig: "",
+		SettingKeyRiskControl:       "false",
+	}}, nil, prefixEncryptor{}, testTotpKeyConfig())
+	svc := NewPromptService(manager, NewPostgreSQLRepository(nil), NewRedisPayloadStore(nil), NewOpenAICompatibleScanner(), NewAtomicMetrics())
+	require.NoError(t, svc.Start(context.Background()))
+	_, err := svc.GetConfig()
+	require.NoError(t, err, "the admin configuration must remain readable during validation")
+	require.Nil(t, svc.runner.cancel, "validation must not consume production-clone audit jobs")
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	require.NoError(t, svc.Shutdown(ctx))
+}
+
 func TestPromptServiceHasExplicitIdempotentLifecycle(t *testing.T) {
 	config := NewConfigManager(nil, staticSettingRepository{values: map[string]string{
 		SettingKeyPromptAuditConfig: "",
