@@ -57,6 +57,14 @@
         <summary class="cursor-pointer select-none text-xs font-medium text-gray-600 dark:text-dark-200">{{ t('admin.promptAudit.events.moreConditions') }}</summary>
         <div class="mt-3 grid gap-3 sm:grid-cols-2">
           <label class="text-xs text-gray-600 dark:text-dark-200">
+            <span>{{ t('admin.promptAudit.events.model') }}</span>
+            <input v-model="local.model" class="input mt-1 w-full" :aria-label="t('admin.promptAudit.events.model')" @input="criteriaChanged" />
+          </label>
+          <label class="text-xs text-gray-600 dark:text-dark-200">
+            <span>{{ t('admin.promptAudit.events.upstreamStatus') }}</span>
+            <select v-model="local.upstream_status" class="input mt-1 w-full" :aria-label="t('admin.promptAudit.events.upstreamStatus')" @change="criteriaChanged"><option value="">{{ t('common.all') }}</option><option value="403">403</option></select>
+          </label>
+          <label class="text-xs text-gray-600 dark:text-dark-200">
             <span>{{ t('admin.promptAudit.events.endpoint') }}</span>
             <input v-model="local.endpoint" type="text" class="input mt-1 w-full" :aria-label="t('admin.promptAudit.events.endpoint')" @input="criteriaChanged" />
           </label>

@@ -63,6 +63,10 @@ export default {
       confirm: '理解风险并开启',
     },
     events: {
+      upstreamStatus: '上游状态',
+      searchGroup: '搜索分组名称', modelHint: '例如 opus，支持部分名称',
+      callerSearch: '用户 / Key 搜索', callerSearchHint: '邮箱、用户名或 Key 名称',
+      recent10m: '最近 10 分钟', recent1h: '最近 1 小时', recent24h: '最近 24 小时',
       title: '审计事件', description: '按身份、入口、风险、Hash 和时间复核事件，详情中可查看完整提示词。', decision: '判定', risk: '风险等级', endpoint: '入口', groupId: '分组 ID', userId: '用户 ID', apiKeyId: 'API Key ID', keyword: '关键词',
       startAt: '开始时间', endAt: '结束时间', deleteSelected: '删除选中项（{count}）', deleteByFilter: '按筛选删除',
       filterDeleteDialogTitle: '按筛选删除审计事件', filterDeleteDialogDesc: '选择删除的时间范围与风险条件后即可执行删除；删除不可恢复。如需提前查看匹配数量，可先获取删除预览。',

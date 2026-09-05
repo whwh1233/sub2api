@@ -71,6 +71,9 @@
               </button>
             </div>
             <EventWorkspace
+              :groups="groups"
+              :groups-loading="loading.groups"
+              :groups-error="loadErrors.groups"
               :events="events.items"
               :total="events.total"
               :page="events.page"

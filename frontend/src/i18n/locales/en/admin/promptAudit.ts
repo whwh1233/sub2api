@@ -63,6 +63,10 @@ export default {
       confirm: 'I understand; enable it',
     },
     events: {
+      upstreamStatus: 'Upstream status',
+      searchGroup: 'Search group names', modelHint: 'e.g. opus; partial names supported',
+      callerSearch: 'User / Key search', callerSearchHint: 'Email, username, or key name',
+      recent10m: 'Last 10 minutes', recent1h: 'Last hour', recent24h: 'Last 24 hours',
       title: 'Audit events', description: 'Review events by identity, route, risk, hash, and time; the detail view shows the full prompt.', decision: 'Decision', risk: 'Risk level', endpoint: 'Endpoint', groupId: 'Group ID', userId: 'User ID', apiKeyId: 'API Key ID', keyword: 'Keyword',
       startAt: 'Start time', endAt: 'End time', deleteSelected: 'Delete selected ({count})', deleteByFilter: 'Delete by filter',
       filterDeleteDialogTitle: 'Delete audit events by filter', filterDeleteDialogDesc: 'Choose the time range and risk criteria, then delete directly. Deletion is permanent. Generate a preview first if you want to see the match count.',

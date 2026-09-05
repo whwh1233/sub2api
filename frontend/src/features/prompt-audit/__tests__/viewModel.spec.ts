@@ -34,6 +34,18 @@ const config = (): PromptAuditConfig => ({
 })
 
 describe('Prompt Audit view model', () => {
+  it('sends the chosen group and partial model with the caller search', () => {
+    const filters = { ...emptyEventFilters(), group_id: '7', model: ' opus ', keyword: 'my-key' }
+    expect(eventFilterPayload(filters)).toMatchObject({ group_id: 7, model: 'opus', keyword: 'my-key' })
+    expect(eventFilterPayload(emptyEventFilters())).not.toHaveProperty('model')
+  })
+  it('includes upstream 403 in search and deletion filters and clears it on reset', () => {
+    const filters = emptyEventFilters()
+    expect(eventFilterPayload(filters)).not.toHaveProperty('upstream_status')
+    filters.upstream_status = '403'
+    expect(eventFilterPayload(filters)).toMatchObject({ upstream_status: 403 })
+    expect(emptyEventFilters().upstream_status).toBe('')
+  })
   it('normalizes legacy null collections from the public config', () => {
     const legacy = { ...config(), group_ids: null, scanners: null, endpoints: null } as unknown as PromptAuditConfig
     expect(configToDraft(legacy)).toMatchObject({ group_ids: [], scanners: [], endpoints: [] })

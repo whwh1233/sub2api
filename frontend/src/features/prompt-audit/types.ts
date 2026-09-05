@@ -199,6 +199,8 @@ export interface PromptAuditEvent {
 }
 
 export interface PromptEventFilters {
+  model: string
+  upstream_status: string
   decision: string
   risk_level: string
   endpoint: string

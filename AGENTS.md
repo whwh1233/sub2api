@@ -17,12 +17,21 @@ state unless the user explicitly asks for those hosts.
 
 ## Production Data Sync Before Upgrade Testing
 
-For this repository, every upgrade, feature validation, migration check, or user-facing test of new behavior must start from a fresh local copy of the production database.
+For routine development and feature validation, use a local production-derived
+development database. Sync only the most recent **10 minutes** of time-series,
+usage, error, and audit records; preserve complete schema and foundational data
+(settings, users, accounts, groups, API keys, and related configuration).
+Do not repeatedly sync during one development task: reuse the current local copy
+for build/test iterations. Refresh the ten-minute sample when starting a new task
+that needs current production records, or when the existing sample is insufficient.
+Full production copies are no longer the default. Use a larger time window or a
+full dump only when the user explicitly requests it or approves a concrete need.
+This rule was explicitly changed by the user on 2026-09-05 for development efficiency.
 
 Required flow:
 
 1. Run `.\.local-dev\sync-prod-db-local.ps1 -StartServer` from the repository root.
-2. The script must stream a new live `pg_dump` from `goodserver`; do not treat an existing backup file as fresh production data unless the user explicitly asks for that.
+2. The script defaults to a fresh ten-minute sample from `goodserver`, streamed directly without remote staging. Reuse that local sample throughout the task; do not describe it as a full production backup.
 3. The script saves the new dump into `.local-prod-db-backups\`, records its checksum, drops and recreates the local `sub2api` database, restores the dump, writes `.local-server-prodtest\config.yaml`, and starts the local backend.
 4. The local `sub2api` database is disposable for this workflow and may be overwritten.
 5. Online database access in this workflow is read-only. The script must not depend on remote backup directory capacity for fresh data sync.

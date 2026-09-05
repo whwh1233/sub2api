@@ -4,6 +4,7 @@ import { mount } from '@vue/test-utils'
 import EndpointPool from '../components/EndpointPool.vue'
 import PolicyPanel from '../components/PolicyPanel.vue'
 import EventWorkspace from '../components/EventWorkspace.vue'
+import Select from '@/components/common/Select.vue'
 import EventDetailDialog from '../components/EventDetailDialog.vue'
 import FilterDeleteDialog from '../components/FilterDeleteDialog.vue'
 import type { PromptAuditDraft, PromptAuditEndpointDraft, PromptAuditEvent, PromptEventFilters } from '../types'
@@ -29,6 +30,28 @@ const endpoint = (): PromptAuditEndpointDraft => ({
 
 describe('Prompt Audit components', () => {
   beforeEach(() => vi.restoreAllMocks())
+
+  it('selects groups by name, searches partial models, and resets combined filters', async () => {
+    const now = Date.parse('2026-09-05T12:00:00Z')
+    vi.spyOn(Date, 'now').mockReturnValue(now)
+    const wrapper = mount(EventWorkspace, {
+      props: { events: [], total: 0, page: 1, pageSize: 20, filters: emptyEventFilters(), selectedIds: [], loading: false, error: '', groups: [{ id: 7, name: 'Claude Max', status: 'active', platform: 'anthropic' }] },
+      global: { stubs: { Pagination: PaginationStub } },
+    })
+    const select = wrapper.findComponent(Select)
+    expect(select.props('options')).toContainEqual({ value: '7', label: 'Claude Max · #7' })
+    select.vm.$emit('update:modelValue', '7')
+    await wrapper.get('[aria-label="admin.promptAudit.events.model"]').setValue('opus')
+    await wrapper.get('[data-test="upstream-status-filter"]').setValue('403')
+    await wrapper.get('[data-test="recent-60"]').trigger('click')
+    const sent = wrapper.emitted('search')!.at(-1)![0] as PromptEventFilters
+    expect(sent).toMatchObject({ group_id: '7', model: 'opus', upstream_status: '403' })
+    expect(new Date(sent.end_at).getTime() - new Date(sent.start_at).getTime()).toBe(3600000)
+    expect(wrapper.get('[data-test="advanced-event-filters"]').attributes()).not.toHaveProperty('open')
+    await wrapper.findAll('button').find(button => button.text() === 'common.reset')!.trigger('click')
+    expect(wrapper.emitted('search')!.at(-1)![0]).toEqual(emptyEventFilters())
+    wrapper.unmount()
+  })
 
   it('edits a saved endpoint with blank-secret keep, explicit clear, replacement, and probe actions', async () => {
     const wrapper = mount(EndpointPool, {

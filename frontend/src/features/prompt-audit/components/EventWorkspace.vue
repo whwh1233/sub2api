@@ -23,7 +23,46 @@
       </div>
     </div>
 
-    <form class="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5" @submit.prevent="applyFilters">
+    <form class="mt-5 space-y-3" @submit.prevent="applyFilters">
+      <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <div class="text-xs text-gray-600 dark:text-dark-200">
+          <label for="prompt-event-group">{{ t('admin.promptAudit.events.group') }}</label>
+          <Select id="prompt-event-group" class="mt-1" :model-value="localFilters.group_id" :options="groupOptions" :searchable="true" :clearable="true" :loading="groupsLoading" :aria-label="t('admin.promptAudit.events.group')" :search-placeholder="t('admin.promptAudit.events.searchGroup')" @update:model-value="selectGroup" />
+          <p v-if="groupsError" role="alert" class="mt-1 text-amber-700 dark:text-amber-300">{{ groupsError }}</p>
+        </div>
+        <label class="text-xs text-gray-600 dark:text-dark-200">
+          <span>{{ t('admin.promptAudit.events.model') }}</span>
+          <input v-model="localFilters.model" class="input mt-1 w-full" list="prompt-event-models" :aria-label="t('admin.promptAudit.events.model')" :placeholder="t('admin.promptAudit.events.modelHint')" @change="filtersChanged" />
+          <datalist id="prompt-event-models"><option v-for="model in modelSuggestions" :key="model" :value="model" /></datalist>
+        </label>
+        <label class="text-xs text-gray-600 dark:text-dark-200">
+          <span>{{ t('admin.promptAudit.events.callerSearch') }}</span>
+          <input v-model="localFilters.keyword" class="input mt-1 w-full" :aria-label="t('admin.promptAudit.events.callerSearch')" :placeholder="t('admin.promptAudit.events.callerSearchHint')" @change="filtersChanged" />
+        </label>
+        <label class="text-xs text-gray-600 dark:text-dark-200">
+          <span>{{ t('admin.promptAudit.events.upstreamStatus') }}</span>
+          <select v-model="localFilters.upstream_status" class="input mt-1 w-full" :aria-label="t('admin.promptAudit.events.upstreamStatus')" data-test="upstream-status-filter" @change="filtersChanged">
+            <option value="">{{ t('common.all') }}</option>
+            <option value="403">403</option>
+          </select>
+        </label>
+      </div>
+      <div class="flex flex-wrap items-end gap-3">
+        <label class="text-xs text-gray-600 dark:text-dark-200">
+          <span>{{ t('admin.promptAudit.events.startAt') }}</span>
+          <input v-model="localFilters.start_at" type="datetime-local" step="0.001" class="input mt-1 w-full" :aria-label="t('admin.promptAudit.events.startAt')" @change="filtersChanged" />
+        </label>
+        <label class="text-xs text-gray-600 dark:text-dark-200">
+          <span>{{ t('admin.promptAudit.events.endAt') }}</span>
+          <input v-model="localFilters.end_at" type="datetime-local" step="0.001" class="input mt-1 w-full" :aria-label="t('admin.promptAudit.events.endAt')" @change="filtersChanged" />
+        </label>
+        <div class="flex flex-wrap gap-1.5">
+          <button v-for="range in timeRanges" :key="range.minutes" type="button" class="btn btn-secondary btn-sm" :data-test="`recent-${range.minutes}`" @click="selectRecentRange(range.minutes)">{{ t(range.label) }}</button>
+        </div>
+      </div>
+      <details class="rounded-lg border border-gray-200 px-3 py-2 dark:border-dark-700" data-test="advanced-event-filters" :open="advancedFilterCount > 0">
+        <summary class="cursor-pointer text-xs font-medium text-gray-600 dark:text-dark-300">{{ t('admin.promptAudit.events.moreConditions') }}<span v-if="advancedFilterCount"> · {{ advancedFilterCount }}</span></summary>
+        <div class="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
       <label class="text-xs text-gray-600 dark:text-dark-200">
         <span>{{ t('admin.promptAudit.events.decision') }}</span>
         <select v-model="localFilters.decision" class="input mt-1 w-full" :aria-label="t('admin.promptAudit.events.decision')" @change="filtersChanged">
@@ -44,21 +83,13 @@
         </select>
       </label>
       <FilterInput v-model="localFilters.endpoint" :label="t('admin.promptAudit.events.endpoint')" @change="filtersChanged" />
-      <FilterInput v-model="localFilters.group_id" :label="t('admin.promptAudit.events.groupId')" type="number" @change="filtersChanged" />
-      <FilterInput v-model="localFilters.user_id" :label="t('admin.promptAudit.events.userId')" type="number" @change="filtersChanged" />
-      <FilterInput v-model="localFilters.api_key_id" :label="t('admin.promptAudit.events.apiKeyId')" type="number" @change="filtersChanged" />
-      <FilterInput v-model="localFilters.request_id" :label="t('admin.promptAudit.events.requestId')" @change="filtersChanged" />
-      <FilterInput v-model="localFilters.prompt_hash" :label="t('admin.promptAudit.events.promptHash')" @change="filtersChanged" />
-      <FilterInput v-model="localFilters.keyword" :label="t('admin.promptAudit.events.keyword')" @change="filtersChanged" />
-      <label class="text-xs text-gray-600 dark:text-dark-200">
-        <span>{{ t('admin.promptAudit.events.startAt') }}</span>
-        <input v-model="localFilters.start_at" type="datetime-local" class="input mt-1 w-full" :aria-label="t('admin.promptAudit.events.startAt')" @change="filtersChanged" />
-      </label>
-      <label class="text-xs text-gray-600 dark:text-dark-200">
-        <span>{{ t('admin.promptAudit.events.endAt') }}</span>
-        <input v-model="localFilters.end_at" type="datetime-local" class="input mt-1 w-full" :aria-label="t('admin.promptAudit.events.endAt')" @change="filtersChanged" />
-      </label>
-      <div class="flex items-end gap-2 sm:col-span-2">
+          <FilterInput v-model="localFilters.user_id" :label="t('admin.promptAudit.events.userId')" type="number" @change="filtersChanged" />
+          <FilterInput v-model="localFilters.api_key_id" :label="t('admin.promptAudit.events.apiKeyId')" type="number" @change="filtersChanged" />
+          <FilterInput v-model="localFilters.request_id" :label="t('admin.promptAudit.events.requestId')" @change="filtersChanged" />
+          <FilterInput v-model="localFilters.prompt_hash" :label="t('admin.promptAudit.events.promptHash')" @change="filtersChanged" />
+        </div>
+      </details>
+      <div class="flex items-center gap-2">
         <button type="submit" class="btn btn-primary btn-sm">{{ t('common.search') }}</button>
         <button type="button" class="btn btn-ghost btn-sm" @click="resetFilters">{{ t('common.reset') }}</button>
       </div>
@@ -142,10 +173,12 @@
 import { computed, defineComponent, h, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Pagination from '@/components/common/Pagination.vue'
-import type { PromptAuditEvent, PromptEventFilters } from '../types'
+import Select from '@/components/common/Select.vue'
+import type { PromptAuditEvent, PromptAuditGroup, PromptEventFilters } from '../types'
 import { cloneData, emptyEventFilters, SCANNER_CATALOG } from '../viewModel'
 
 const props = defineProps<{
+  groups?: PromptAuditGroup[]; groupsLoading?: boolean; groupsError?: string
   events: PromptAuditEvent[]; total: number; page: number; pageSize: number
   filters: PromptEventFilters; selectedIds: number[]; loading: boolean; error: string
 }>()
@@ -165,6 +198,39 @@ const localFilters = reactive<PromptEventFilters>(cloneData(props.filters))
 const tableScrollRef = ref<HTMLElement | null>(null)
 watch(() => props.filters, (value) => Object.assign(localFilters, cloneData(value)), { deep: true })
 const allSelected = computed(() => props.events.length > 0 && props.events.every((event) => props.selectedIds.includes(event.id)))
+const groupOptions = computed(() => {
+  const names = new Map<string, string>()
+  for (const group of props.groups || []) names.set(String(group.id), group.name)
+  for (const event of props.events) {
+    const id = event.snapshot.group_id
+    if (id && !names.has(String(id))) names.set(String(id), event.snapshot.group_name || `#${id}`)
+  }
+  if (localFilters.group_id && !names.has(localFilters.group_id)) names.set(localFilters.group_id, `#${localFilters.group_id}`)
+  return [{ value: '', label: t('common.all') }, ...Array.from(names, ([value, name]) => ({ value, label: `${name} · #${value}` }))]
+})
+const modelSuggestions = computed(() => [...new Set(props.events.map(event => event.snapshot.model).filter(Boolean))].sort())
+const advancedFilterCount = computed(() => [localFilters.decision, localFilters.risk_level, localFilters.endpoint, localFilters.user_id, localFilters.api_key_id, localFilters.request_id, localFilters.prompt_hash].filter(Boolean).length)
+const timeRanges = [
+  { minutes: 10, label: 'admin.promptAudit.events.recent10m' },
+  { minutes: 60, label: 'admin.promptAudit.events.recent1h' },
+  { minutes: 1440, label: 'admin.promptAudit.events.recent24h' },
+  { minutes: 0, label: 'common.all' },
+]
+
+function selectGroup(value: string | number | boolean | null) {
+  localFilters.group_id = value == null ? '' : String(value)
+  filtersChanged()
+}
+function selectRecentRange(minutes: number) {
+  const now = Date.now()
+  const localTime = (timestamp: number) => {
+    const date = new Date(timestamp)
+    return new Date(timestamp - date.getTimezoneOffset() * 60000).toISOString().slice(0, 23)
+  }
+  localFilters.start_at = minutes ? localTime(now - minutes * 60000) : ''
+  localFilters.end_at = minutes ? localTime(now) : ''
+  applyFilters()
+}
 
 const FilterInput = defineComponent({
   props: { modelValue: { type: String, required: true }, label: { type: String, required: true }, type: { type: String, default: 'text' } },

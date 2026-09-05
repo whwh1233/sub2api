@@ -15,17 +15,19 @@ import (
 )
 
 type EventFilter struct {
-	Decision   string     `json:"decision,omitempty"`
-	RiskLevel  string     `json:"risk_level,omitempty"`
-	Endpoint   string     `json:"endpoint,omitempty"`
-	GroupID    *int64     `json:"group_id,omitempty"`
-	UserID     *int64     `json:"user_id,omitempty"`
-	APIKeyID   *int64     `json:"api_key_id,omitempty"`
-	RequestID  string     `json:"request_id,omitempty"`
-	PromptHash string     `json:"prompt_hash,omitempty"`
-	Keyword    string     `json:"keyword,omitempty"`
-	StartAt    *time.Time `json:"start_at,omitempty"`
-	EndAt      *time.Time `json:"end_at,omitempty"`
+	Model          string     `json:"model,omitempty"`
+	UpstreamStatus int        `json:"upstream_status,omitempty"`
+	Decision       string     `json:"decision,omitempty"`
+	RiskLevel      string     `json:"risk_level,omitempty"`
+	Endpoint       string     `json:"endpoint,omitempty"`
+	GroupID        *int64     `json:"group_id,omitempty"`
+	UserID         *int64     `json:"user_id,omitempty"`
+	APIKeyID       *int64     `json:"api_key_id,omitempty"`
+	RequestID      string     `json:"request_id,omitempty"`
+	PromptHash     string     `json:"prompt_hash,omitempty"`
+	Keyword        string     `json:"keyword,omitempty"`
+	StartAt        *time.Time `json:"start_at,omitempty"`
+	EndAt          *time.Time `json:"end_at,omitempty"`
 }
 
 type EventPage struct {
@@ -245,6 +247,7 @@ func validateDeleteFilter(filter EventFilter) error {
 }
 
 func canonicalEventFilter(filter EventFilter) EventFilter {
+	filter.Model = strings.TrimSpace(filter.Model)
 	filter.Decision = strings.TrimSpace(strings.ToLower(filter.Decision))
 	filter.RiskLevel = strings.TrimSpace(strings.ToLower(filter.RiskLevel))
 	filter.Endpoint = strings.TrimSpace(filter.Endpoint)
@@ -279,6 +282,10 @@ func buildEventWhere(filter EventFilter, firstIndex int) (string, []any) {
 	if filter.Endpoint != "" {
 		add(" AND e.endpoint=$%d", filter.Endpoint)
 	}
+	if filter.Model != "" {
+		pattern := strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(TrimRunes(filter.Model, 128))
+		add(" AND e.model ILIKE $%d", "%"+pattern+"%")
+	}
 	if filter.GroupID != nil {
 		add(" AND e.group_id=$%d", *filter.GroupID)
 	}
@@ -290,6 +297,14 @@ func buildEventWhere(filter EventFilter, firstIndex int) (string, []any) {
 	}
 	if filter.RequestID != "" {
 		add(" AND e.request_id=$%d", filter.RequestID)
+	}
+	if filter.UpstreamStatus != 0 {
+		add(` AND e.request_id<>'' AND EXISTS (
+			SELECT 1 FROM ops_error_logs o WHERE o.request_id=e.request_id
+			AND o.user_id IS NOT DISTINCT FROM e.user_id
+			AND o.api_key_id IS NOT DISTINCT FROM e.api_key_id
+			AND o.upstream_status_code=$%d
+		)`, filter.UpstreamStatus)
 	}
 	if filter.PromptHash != "" {
 		add(" AND e.prompt_hash=$%d", filter.PromptHash)

@@ -256,6 +256,13 @@ func adminID(c *gin.Context) int64 {
 }
 
 func eventFilterFromQuery(c *gin.Context) (EventFilter, error) {
+	upstreamStatus, err := optionalPositiveInt64Query(c, "upstream_status")
+	if err != nil {
+		return EventFilter{}, err
+	}
+	if upstreamStatus != nil && *upstreamStatus != 403 {
+		return EventFilter{}, infraerrors.BadRequest("prompt_audit_invalid_upstream_status", "上游状态筛选仅支持 403")
+	}
 	groupID, err := optionalPositiveInt64Query(c, "group_id")
 	if err != nil {
 		return EventFilter{}, err
@@ -269,9 +276,13 @@ func eventFilterFromQuery(c *gin.Context) (EventFilter, error) {
 		return EventFilter{}, err
 	}
 	filter := EventFilter{
+		Model:    c.Query("model"),
 		Decision: c.Query("decision"), RiskLevel: c.Query("risk_level"), Endpoint: c.Query("endpoint"),
 		GroupID: groupID, UserID: userID, APIKeyID: apiKeyID, RequestID: c.Query("request_id"),
 		PromptHash: c.Query("prompt_hash"), Keyword: c.Query("keyword"),
+	}
+	if upstreamStatus != nil {
+		filter.UpstreamStatus = int(*upstreamStatus)
 	}
 	if value := strings.TrimSpace(c.Query("start_at")); value != "" {
 		filter.StartAt = parseTimeQuery(value)

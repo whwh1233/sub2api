@@ -15,14 +15,21 @@ This runbook records the verified production upgrade procedure established on
 
 ## 2. Fresh production database sync
 
-Every upgrade test starts with a new live production dump. Never reuse an older
-dump merely because it exists locally. The required entry point remains:
+As explicitly requested on 2026-09-05, routine development and feature testing
+default to a live **ten-minute sample**, preserving full schema and foundational
+configuration but only recent usage/error/audit/time-series rows. Reuse this local
+copy for all iterations of the same task; do not repeatedly synchronize it.
+A wider time range or full historical copy requires a concrete need and explicit
+user approval. A ten-minute sample is not a full production backup or evidence of
+historical-data migration coverage. The required entry point remains:
 
 ```powershell
 .\.local-dev\sync-prod-db-local.ps1 -StartServer
 ```
 
 Production access during sync is read-only; the local `sub2api` database is disposable.
+The historical full-dump benchmarks below are reference material, not the default
+development workflow. Use `-FullDatabase` only when explicitly authorized.
 
 ### Proven fast transfer design
 
