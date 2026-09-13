@@ -18,3 +18,13 @@ $developmentGoBin = Join-Path $env:GOPATH 'bin'
 if ($developmentGoBin -notin ($env:PATH -split ';')) {
     $env:PATH = "$developmentGoBin;$env:PATH"
 }
+
+# Upstream backup-lock tests use sh; Git for Windows ships it outside cmd/.
+$developmentGit = Get-Command git -ErrorAction SilentlyContinue
+if ($developmentGit) {
+    $developmentGitBin = Join-Path (Split-Path (Split-Path $developmentGit.Source -Parent) -Parent) 'bin'
+    if ((Test-Path -LiteralPath (Join-Path $developmentGitBin 'sh.exe')) -and
+        $developmentGitBin -notin ($env:PATH -split ';')) {
+        $env:PATH = "$developmentGitBin;$env:PATH"
+    }
+}

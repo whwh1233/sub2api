@@ -6,13 +6,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestCLIIdentityMatchesClaudeCode241 把伪装身份钉在本机官方 CLI 2.1.241 的提取结果上。
-// 升级 Claude Code 后如果这些值变了，应先对照二进制再改常量，避免 UA / beta / stainless 漂移。
-func TestCLIIdentityMatchesClaudeCode241(t *testing.T) {
-	require.Equal(t, "2.1.241", CLICurrentVersion)
+// Preserve the custom CLI headers and cache betas while accepting the upstream Fable 5.1 baseline.
+func TestCLIIdentityPreservesCustomHeadersAndUpstreamBaseline(t *testing.T) {
+	require.Equal(t, "2.1.258", CLICurrentVersion)
 	require.Equal(t, "0.112.1", CLIStainlessPackageVersion)
 	require.Equal(t, "claude_code_cli", CLIClientPlatform)
-	require.Equal(t, "claude-cli/2.1.241 (external, cli)", DefaultHeaders["User-Agent"])
+	require.Equal(t, "claude-cli/2.1.258 (external, cli)", DefaultHeaders["User-Agent"])
 	require.Equal(t, CLIStainlessPackageVersion, DefaultHeaders["X-Stainless-Package-Version"])
 	require.Equal(t, CLIClientPlatform, DefaultHeaders["anthropic-client-platform"])
 	require.Equal(t, "cli", DefaultHeaders["X-App"])
@@ -24,6 +23,7 @@ func TestCLIIdentityMatchesClaudeCode241(t *testing.T) {
 		BetaEffort,
 		BetaPromptCachingScope,
 		BetaPromptCachingEvict,
+		BetaThinkingBindingControls,
 		BetaExtendedCacheTTL,
 	}, FullClaudeCodeMimicryBetas())
 	require.NotContains(t, FullClaudeCodeMimicryBetas(), BetaRedactThinking)

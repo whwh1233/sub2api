@@ -105,6 +105,8 @@ export default {
       soon: 'More advanced models coming',
       chatgpt: 'ChatGPT',
       claude: 'Claude',
+      gemini: 'Gemini',
+      antigravity: 'Antigravity',
       gpt55: 'GPT 5.5',
       gpt54: 'GPT 5.4',
       opus48: 'Opus 4.8',

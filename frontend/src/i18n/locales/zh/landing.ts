@@ -105,6 +105,8 @@ export default {
       soon: '更多高阶模型持续接入',
       chatgpt: 'ChatGPT',
       claude: 'Claude',
+      gemini: 'Gemini',
+      antigravity: 'Antigravity',
       gpt55: 'GPT 5.5',
       gpt54: 'GPT 5.4',
       opus48: 'Opus 4.8',

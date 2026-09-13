@@ -20,12 +20,13 @@ const (
 	BetaFastMode                 = "fast-mode-2026-02-01"
 
 	// 对齐官方 CLI 2.1.241 的 Ux() beta 注册表（主 messages 路径会按能力选子集）
-	BetaPromptCachingScope = "prompt-caching-scope-2026-01-05"
-	BetaPromptCachingEvict = "prompt-caching-evict-2026-05-12"
-	BetaEffort             = "effort-2025-11-24"
-	BetaRedactThinking     = "redact-thinking-2026-02-12"
-	BetaContextManagement  = "context-management-2025-06-27"
-	BetaExtendedCacheTTL   = "extended-cache-ttl-2025-04-11"
+	BetaPromptCachingScope      = "prompt-caching-scope-2026-01-05"
+	BetaPromptCachingEvict      = "prompt-caching-evict-2026-05-12"
+	BetaEffort                  = "effort-2025-11-24"
+	BetaRedactThinking          = "redact-thinking-2026-02-12"
+	BetaContextManagement       = "context-management-2025-06-27"
+	BetaExtendedCacheTTL        = "extended-cache-ttl-2025-04-11"
+	BetaThinkingBindingControls = "thinking-binding-controls-2026-08-01"
 
 	// server-side refusal fallback beta 字段族（beta Messages API 专有）。
 	// 客户端（Claude Code / SDK / OpenCode 等）会默认透传 body.fallbacks /
@@ -80,8 +81,8 @@ const DefaultCacheControlTTL = "5m"
 // 必须与 DefaultHeaders["User-Agent"] 中的版本号严格一致；不一致会被 Anthropic 判第三方。
 //
 // 运行时通过 CLIVersion() 读取版本，以应用 SUB2API_CLAUDE_CLI_VERSION 覆盖。
-// 对齐本机官方 CLI：@anthropic-ai/claude-code@2.1.241（BUILD_TIME 2026-08-22T22:46:48Z）。
-const CLICurrentVersion = "2.1.241"
+// 跟随上游 2.1.258 基线，满足 Fable 5.1 的最低 CLI 版本要求。
+const CLICurrentVersion = "2.1.258"
 
 // CLIStainlessPackageVersion 是官方 CLI 内嵌 Anthropic JS SDK 的 X-Stainless-Package-Version。
 // 2.1.241 二进制中 FMe="0.112.1"。
@@ -110,6 +111,7 @@ func FullClaudeCodeMimicryBetas() []string {
 		BetaEffort,
 		BetaPromptCachingScope,
 		BetaPromptCachingEvict,
+		BetaThinkingBindingControls,
 		BetaExtendedCacheTTL,
 	}
 }
