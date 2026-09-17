@@ -709,6 +709,7 @@ func ProvideBackupService(
 // hold a *SettingService reference, but wire injects a tiny callback so writes to
 // ops_advanced_settings immediately propagate into the scheduler hot-path cache.
 func ProvideOpsService(
+	groupRealtimeStore GroupRealtimeStore,
 	opsRepo OpsRepository,
 	settingRepo SettingRepository,
 	cfg *config.Config,
@@ -744,6 +745,7 @@ func ProvideOpsService(
 		settingService.WarmOpenAIQuotaAutoPauseSettings(context.Background())
 	}
 	svc.authCacheInvalidationWorker = authCacheInvalidationWorker
+	svc.groupRealtime = NewGroupRealtimeMonitor(groupRealtimeStore)
 	svc.apiKeyService = apiKeyService
 	startBackgroundWorker(func() { svc.StartRuntimeSettingsRefresh(context.Background()) })
 	return svc

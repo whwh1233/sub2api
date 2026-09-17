@@ -1,0 +1,25 @@
+export default {
+  groupRealtime: {
+    title: 'Group Realtime',
+    description: 'Live traffic and outcomes by entry group, refreshed every 5 seconds.',
+    scope: 'RPM counts inference requests entering in the last 60 seconds. Success rate uses requests completed in the last 60 seconds, excluding client cancellations. Internal retries count once; WebSocket requests count per turn.',
+    window: 'Window', updated: 'Updated', refresh: 'Refresh', pause: 'Pause', resume: 'Resume',
+    paused: 'Paused', stale: 'Data is stale', live: 'Auto-refreshing', partial: 'Collector warming up or collection gap detected. These counts may be incomplete.',
+    loadError: 'Unable to fetch realtime data. Retry, or enable monitoring in Ops settings if disabled.',
+    search: 'Search group name or ID', platform: 'Platform', allPlatforms: 'All platforms',
+    totalRPM: 'Total RPM', totalRate: 'Overall success rate', activeGroups: 'Groups with arrivals', filtered: 'Current filters',
+    group: 'Group', rpm: 'RPM · arrivals', rate: 'Success rate · completions', success: 'Success', failed: 'Failed', cancelled: 'Cancelled',
+    sample: 'Small sample', noRequests: 'No completed requests', unknownGroup: 'Unassigned', removedGroup: 'Group #{id}', inactive: 'Inactive',
+    empty: 'No matching groups', loading: 'Loading realtime data…',
+    details: 'Failure reasons', detailsHint: 'Final failures in the snapshot window at the time you clicked. Internal retries are excluded.',
+    reason: 'Reason', count: 'Requests', sortHint: 'Click a column heading to re-sort. Auto-refresh preserves row order.',
+    sort: 'Sort', ascending: 'Ascending ↑', descending: 'Descending ↓',
+    reasons: {
+      content_policy: 'Content policy', authentication: 'Authentication', context_limit: 'Context limit',
+      invalid_request: 'Invalid request', model_unsupported: 'Unsupported model', group_access: 'Group access denied',
+      quota_or_balance: 'Quota or balance', account_pool_unavailable: 'No available account', rate_or_capacity: 'Rate or capacity limit',
+      timeout: 'Timeout', transport_or_stream: 'Connection or stream failure', upstream_forbidden: 'Upstream access denied',
+      not_found: 'Not found', client_cancelled: 'Client cancelled', upstream_5xx: 'Upstream server error', internal: 'Internal error', other: 'Other',
+    },
+  },
+}

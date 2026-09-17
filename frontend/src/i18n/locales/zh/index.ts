@@ -6,6 +6,7 @@ import batchImage from './batchImage'
 import leaderboard from './leaderboard'
 import community from './community'
 import admin from './admin'
+import groupRealtime from './groupRealtime'
 import misc from './misc'
 
 export default {
@@ -17,5 +18,6 @@ export default {
   ...leaderboard,
   ...community,
   admin,
+  ...groupRealtime,
   ...misc,
 }

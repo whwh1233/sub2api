@@ -1,0 +1,25 @@
+export default {
+  groupRealtime: {
+    title: '分组实时',
+    description: '按入口分组查看实时流量与请求结果，每 5 秒自动刷新。',
+    scope: 'RPM 为最近 60 秒进入的推理请求数；成功率按最近 60 秒完成的请求计算，排除主动取消。内部重试不重复计数，WebSocket 按请求轮次统计。',
+    window: '统计窗口', updated: '更新时间', refresh: '刷新', pause: '暂停刷新', resume: '恢复刷新',
+    paused: '已暂停', stale: '数据已过期', live: '自动刷新中', partial: '采集预热或存在采集缺口，当前数据可能不完整。',
+    loadError: '实时数据获取失败，请重试；如监控已关闭，请先在运维设置中启用。',
+    search: '搜索分组名称或 ID', platform: '平台', allPlatforms: '全部平台',
+    totalRPM: '总 RPM', totalRate: '整体成功率', activeGroups: '有请求的分组', filtered: '当前筛选范围',
+    group: '分组', rpm: 'RPM · 进入', rate: '成功率 · 完成', success: '成功', failed: '失败', cancelled: '主动取消',
+    sample: '样本较少', noRequests: '暂无完成请求', unknownGroup: '未归属', removedGroup: '分组 #{id}', inactive: '已停用',
+    empty: '没有符合条件的分组', loading: '正在获取实时数据…',
+    details: '失败原因', detailsHint: '以下为点击时统计窗口内的最终失败数量。内部重试已排除。',
+    reason: '原因', count: '请求数', sortHint: '点击列标题重新排序；自动刷新保留当前行顺序。',
+    sort: '排序', ascending: '升序 ↑', descending: '降序 ↓',
+    reasons: {
+      content_policy: '内容策略拒绝', authentication: '鉴权失败', context_limit: '上下文超限',
+      invalid_request: '请求参数错误', model_unsupported: '模型不支持', group_access: '分组权限不足',
+      quota_or_balance: '余额或配额不足', account_pool_unavailable: '无可用账号', rate_or_capacity: '限流或并发不足',
+      timeout: '请求超时', transport_or_stream: '连接或流式响应失败', upstream_forbidden: '上游拒绝访问',
+      not_found: '资源不存在', client_cancelled: '客户端取消', upstream_5xx: '上游服务错误', internal: '内部错误', other: '其他错误',
+    },
+  },
+}

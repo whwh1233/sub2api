@@ -438,6 +438,18 @@ const routes: RouteRecordRaw[] = [
     }
   },
   {
+    path: '/admin/group-realtime',
+    name: 'AdminGroupRealtime',
+    component: () => import('@/views/admin/GroupRealtimeView.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: true,
+      title: 'Group Realtime',
+      titleKey: 'groupRealtime.title',
+      descriptionKey: 'groupRealtime.description'
+    }
+  },
+  {
     path: '/admin/ops',
     name: 'AdminOps',
     component: () => import('@/views/admin/ops/OpsDashboard.vue'),

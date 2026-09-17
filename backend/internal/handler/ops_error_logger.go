@@ -1088,7 +1088,19 @@ func OpsErrorLoggerMiddleware(ops *service.OpsService) gin.HandlerFunc {
 			releaseOpsCaptureWriter(w)
 		}()
 		c.Writer = w
+		var realtime *service.GroupRealtimeObserver
+		if isGroupRealtimeRequest(c) {
+			realtime = ops.BeginGroupRealtime(c, strings.EqualFold(c.GetHeader("Upgrade"), "websocket"))
+		}
+		finished := false
+		defer func() {
+			if realtime != nil {
+				w.finalizeCapture()
+				realtime.Finish(groupRealtimeOutcome(c, w, !finished))
+			}
+		}()
 		c.Next()
+		finished = true
 		w.finalizeCapture()
 
 		if _, rejected := middleware2.GetIngressRejectReason(c); rejected {
