@@ -74,7 +74,8 @@ const formatSeriesLabel = (key: string, label: string) => {
   return label || key
 }
 
-const pointValue = (point: { total_rpm: number; success_rpm: number; error_rpm: number }) => {
+const pointValue = (point: { total_rpm: number | null; success_rpm: number | null; error_rpm: number | null; partial: boolean }) => {
+  if (point.partial) return null
   if (metric.value === 'success') return point.success_rpm
   if (metric.value === 'error') return point.error_rpm
   return point.total_rpm
@@ -107,7 +108,8 @@ const chartData = computed(() => {
       const color = palette[index % palette.length]
       return {
         label: formatSeriesLabel(item.key, item.label),
-        data: buckets.map((bucket) => values.get(bucket) ?? 0),
+        data: buckets.map((bucket) => values.get(bucket) ?? null),
+        spanGaps: false,
         borderColor: color,
         backgroundColor: `${color}18`,
         fill: false,
@@ -279,6 +281,7 @@ onBeforeUnmount(() => controller?.abort())
       </div>
     </div>
 
+    <p v-if="response?.partial" role="status" class="mt-4 text-sm text-amber-700 dark:text-amber-400">{{ t('admin.ops.rpm.partial') }}</p>
     <div v-if="errorMessage" class="mt-4 rounded-xl bg-red-50 p-3 text-sm text-red-600 dark:bg-red-900/20 dark:text-red-400" role="alert">
       {{ errorMessage }}
     </div>

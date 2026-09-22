@@ -111,9 +111,10 @@ export interface OpsRPMTrendPoint {
   bucket_start: string
   success_count: number
   error_count: number
-  success_rpm: number
-  error_rpm: number
-  total_rpm: number
+  success_rpm: number | null
+  error_rpm: number | null
+  total_rpm: number | null
+  partial: boolean
 }
 
 export interface OpsRPMTrendSeries {
@@ -123,6 +124,7 @@ export interface OpsRPMTrendSeries {
 }
 
 export interface OpsRPMTrendResponse {
+  partial: boolean
   generated_at: string
   start_time: string
   end_time: string

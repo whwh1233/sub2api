@@ -401,12 +401,9 @@ func (c *OpsMetricsCollector) collectRPMOnce() {
 		return
 	}
 
-	release, ok := c.tryAcquireNamedLeaderLock(
-		ctx,
-		opsRPMCollectorLeaderLockKey,
-		opsRPMCollectorLeaderLockTTL,
-		opsRPMCollectorAdvisoryLockID,
-	)
+	// RPM collection uses PostgreSQL for coordination as well as data; Redis
+	// availability must not determine whether database history can advance.
+	release, ok := tryAcquireDBAdvisoryLock(ctx, c.db, opsRPMCollectorAdvisoryLockID)
 	if !ok {
 		return
 	}
@@ -439,30 +436,58 @@ func (c *OpsMetricsCollector) collectRPMOnce() {
 }
 
 func (c *OpsMetricsCollector) collectAndPersistRPM(ctx context.Context, windowEnd time.Time) error {
+	// Resume durable progress in bounded batches. Older gaps remain explicitly
+	// unknown; never rescan more than 15 minutes of request logs per tick.
+	windowEnd = windowEnd.UTC().Truncate(time.Minute)
+	wallEnd := windowEnd
+	windowStart := windowEnd.Add(-opsRPMMinuteOverlap)
+	last, err := c.opsRepo.GetRPMCollectionEnd(ctx, 60)
+	if err != nil {
+		return fmt.Errorf("read RPM progress: %w", err)
+	}
+	if last != nil && last.Add(-opsRPMMinuteOverlap).Before(windowStart) {
+		windowStart = last.Add(-opsRPMMinuteOverlap)
+	}
+	if earliest := wallEnd.Add(-24 * time.Hour); windowStart.Before(earliest) {
+		windowStart = earliest
+	}
+	if batchEnd := windowStart.Add(15 * time.Minute); batchEnd.Before(windowEnd) {
+		windowEnd = batchEnd
+	}
 	// Recompute a short overlap to heal delayed writes and brief collector pauses
 	// without adding any work to the request path.
-	if err := c.opsRepo.UpsertRPMMinuteMetrics(ctx, windowEnd.Add(-opsRPMMinuteOverlap), windowEnd); err != nil {
+	if err := c.opsRepo.UpsertRPMMinuteMetrics(ctx, windowStart, windowEnd); err != nil {
 		return fmt.Errorf("upsert RPM minute metrics: %w", err)
 	}
 
 	// Coarser retention tiers are derived exclusively from the compact minute
 	// table; they never rescan request logs.
-	fiveMinuteEnd := windowEnd.Truncate(5 * time.Minute)
-	if err := c.opsRepo.UpsertRPMRollup(ctx, 60, 300, fiveMinuteEnd.Add(-5*time.Minute), fiveMinuteEnd); err != nil {
-		return fmt.Errorf("upsert RPM five-minute rollup: %w", err)
-	}
-	if windowEnd.Minute()%10 == 0 {
-		twoHourEnd := windowEnd.Truncate(2 * time.Hour)
-		if err := c.opsRepo.UpsertRPMRollup(ctx, 300, 7200, twoHourEnd.Add(-2*time.Hour), twoHourEnd); err != nil {
-			return fmt.Errorf("upsert RPM two-hour rollup: %w", err)
+	for _, tier := range [][2]int{{60, 300}, {300, 7200}} {
+		step := time.Duration(tier[1]) * time.Second
+		end := windowEnd.Truncate(step)
+		start := windowStart.Truncate(step)
+		last, err := c.opsRepo.GetRPMCollectionEnd(ctx, tier[1])
+		if err != nil {
+			return fmt.Errorf("read RPM rollup progress: %w", err)
+		}
+		if last != nil && last.Add(-step).Before(start) {
+			start = last.Add(-step)
+		}
+		if earliest := wallEnd.Add(-24 * time.Hour).Truncate(step); start.Before(earliest) {
+			start = earliest
+		}
+		if start.Before(end) {
+			if err := c.opsRepo.UpsertRPMRollup(ctx, tier[0], tier[1], start, end); err != nil {
+				return fmt.Errorf("upsert RPM rollup: %w", err)
+			}
 		}
 	}
-	if windowEnd.Hour() == 2 && windowEnd.Minute() < 5 {
+	if wallEnd.Hour() == 2 && wallEnd.Minute() < 5 {
 		if err := c.opsRepo.CleanupRPMMetrics(
 			ctx,
-			windowEnd.Add(-opsRPMMinuteRetention),
-			windowEnd.Add(-opsRPMFiveMinuteRetention),
-			windowEnd.Add(-opsRPMTwoHourRetention),
+			wallEnd.Add(-opsRPMMinuteRetention),
+			wallEnd.Add(-opsRPMFiveMinuteRetention),
+			wallEnd.Add(-opsRPMTwoHourRetention),
 		); err != nil {
 			return fmt.Errorf("cleanup RPM metrics: %w", err)
 		}

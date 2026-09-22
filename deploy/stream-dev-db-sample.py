@@ -55,7 +55,7 @@ def main():
                        name.startswith(("usage_billing_dedup", "usage_dashboard_", "ops_metrics_")) or
                        name in {"prompt_audit_jobs", "billing_usage_entries", "ops_system_metrics",
                                 "ops_ingress_reject_aggregates", "usage_group_daily_rollups",
-                                "ops_group_minute_metrics"})
+                                "ops_group_minute_metrics", "ops_group_log_minute_metrics", "ops_rpm_metrics", "ops_rpm_coverage"})
             if not history:
                 if table["bytes"] > 64 * 1024 * 1024:
                     raise ValueError("Large unclassified table requires an explicit sampling rule: " + name)

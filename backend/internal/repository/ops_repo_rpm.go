@@ -90,8 +90,30 @@ DO UPDATE SET
   error_count = EXCLUDED.error_count,
   computed_at = NOW()`
 
-	_, err := r.db.ExecContext(ctx, q, startTime.UTC(), endTime.UTC())
-	return err
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+	if _, err = tx.ExecContext(ctx, q, startTime.UTC(), endTime.UTC()); err != nil {
+		return err
+	}
+	if _, err = tx.ExecContext(ctx, `INSERT INTO ops_rpm_coverage(bucket_seconds,bucket_start)
+SELECT 60, generate_series($1::timestamptz,$2::timestamptz-interval '1 minute',interval '1 minute')
+ON CONFLICT DO NOTHING`, startTime.UTC(), endTime.UTC()); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+func (r *opsRepository) GetRPMCollectionEnd(ctx context.Context, bucketSeconds int) (*time.Time, error) {
+	var latest sql.NullTime
+	err := r.db.QueryRowContext(ctx, `SELECT MAX(bucket_start) FROM ops_rpm_coverage WHERE bucket_seconds=$1`, bucketSeconds).Scan(&latest)
+	if err != nil || !latest.Valid {
+		return nil, err
+	}
+	end := latest.Time.UTC().Add(time.Duration(bucketSeconds) * time.Second)
+	return &end, nil
 }
 
 func (r *opsRepository) UpsertRPMRollup(
@@ -116,7 +138,7 @@ INSERT INTO ops_rpm_metrics (
   success_count, error_count, computed_at
 )
 SELECT
-  date_bin(make_interval(secs => $2), bucket_start, TIMESTAMPTZ '1970-01-01 00:00:00+00'),
+  date_bin(make_interval(secs => $2::int), bucket_start, TIMESTAMPTZ '1970-01-01 00:00:00+00'),
   $2,
   dimension_type,
   dimension_key,
@@ -135,8 +157,21 @@ DO UPDATE SET
   error_count = EXCLUDED.error_count,
   computed_at = NOW()`
 
-	_, err := r.db.ExecContext(ctx, q, sourceBucketSeconds, targetBucketSeconds, startTime.UTC(), endTime.UTC())
-	return err
+	tx, err := r.db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelRepeatableRead})
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+	if _, err = tx.ExecContext(ctx, q, sourceBucketSeconds, targetBucketSeconds, startTime.UTC(), endTime.UTC()); err != nil {
+		return err
+	}
+	if _, err = tx.ExecContext(ctx, `INSERT INTO ops_rpm_coverage(bucket_seconds,bucket_start)
+SELECT $2::int, date_bin(make_interval(secs => $2::int),bucket_start,TIMESTAMPTZ '1970-01-01 00:00:00+00')
+FROM ops_rpm_coverage WHERE bucket_seconds=$1 AND bucket_start >= $3 AND bucket_start < $4
+GROUP BY 2 HAVING COUNT(*)=$2/$1 ON CONFLICT DO NOTHING`, sourceBucketSeconds, targetBucketSeconds, startTime.UTC(), endTime.UTC()); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 func (r *opsRepository) CleanupRPMMetrics(
@@ -151,8 +186,20 @@ DELETE FROM ops_rpm_metrics
 WHERE (bucket_seconds = 60 AND bucket_start < $1)
    OR (bucket_seconds = 300 AND bucket_start < $2)
    OR (bucket_seconds = 7200 AND bucket_start < $3)`
-	_, err := r.db.ExecContext(ctx, q, minuteCutoff.UTC(), fiveMinuteCutoff.UTC(), twoHourCutoff.UTC())
-	return err
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+	if _, err = tx.ExecContext(ctx, q, minuteCutoff.UTC(), fiveMinuteCutoff.UTC(), twoHourCutoff.UTC()); err != nil {
+		return err
+	}
+	if _, err = tx.ExecContext(ctx, `DELETE FROM ops_rpm_coverage
+WHERE (bucket_seconds=60 AND bucket_start<$1) OR (bucket_seconds=300 AND bucket_start<$2)
+OR (bucket_seconds=7200 AND bucket_start<$3)`, minuteCutoff.UTC(), fiveMinuteCutoff.UTC(), twoHourCutoff.UTC()); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 func (r *opsRepository) GetRPMTrend(ctx context.Context, filter *service.OpsRPMTrendFilter) (*service.OpsRPMTrendResponse, error) {
@@ -208,7 +255,13 @@ SELECT display_bucket, dimension_key, dimension_label, success_count, error_coun
 FROM combined
 ORDER BY series_rank, dimension_key, display_bucket`
 
-	rows, err := r.db.QueryContext(
+	// Keep coverage and counts on the same snapshot while the collector commits.
+	tx, err := r.db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelRepeatableRead, ReadOnly: true})
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = tx.Rollback() }()
+	rows, err := tx.QueryContext(
 		ctx,
 		q,
 		filter.SourceBucketSeconds,
@@ -242,16 +295,41 @@ ORDER BY series_rank, dimension_key, display_bucket`
 			seriesByKey[key] = series
 			seriesOrder = append(seriesOrder, key)
 		}
+		successRPM, errorRPM, totalRPM := float64(successCount)/minutes, float64(errorCount)/minutes, float64(successCount+errorCount)/minutes
 		series.Points = append(series.Points, &service.OpsRPMTrendPoint{
 			BucketStart:  bucket.UTC(),
 			SuccessCount: successCount,
 			ErrorCount:   errorCount,
-			SuccessRPM:   float64(successCount) / minutes,
-			ErrorRPM:     float64(errorCount) / minutes,
-			TotalRPM:     float64(successCount+errorCount) / minutes,
+			SuccessRPM:   &successRPM,
+			ErrorRPM:     &errorRPM,
+			TotalRPM:     &totalRPM,
 		})
 	}
 	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	coverage, err := tx.QueryContext(ctx, `SELECT bucket_start FROM ops_rpm_coverage
+WHERE bucket_seconds=$1 AND bucket_start >= $2 AND bucket_start < $3 ORDER BY bucket_start`, filter.SourceBucketSeconds, filter.StartTime.UTC(), filter.EndTime.UTC())
+	if err != nil {
+		return nil, err
+	}
+	covered := make(map[int64]bool)
+	var latest time.Time
+	for coverage.Next() {
+		var bucket time.Time
+		if err := coverage.Scan(&bucket); err != nil {
+			_ = coverage.Close()
+			return nil, err
+		}
+		covered[bucket.Unix()] = true
+		latest = bucket.UTC().Add(time.Duration(filter.SourceBucketSeconds) * time.Second)
+	}
+	err = coverage.Err()
+	_ = coverage.Close()
+	if err != nil {
 		return nil, err
 	}
 
@@ -261,6 +339,15 @@ ORDER BY series_rank, dimension_key, display_bucket`
 		(filter.StartTime.UTC().Unix()/int64(filter.OutputBucketSeconds))*int64(filter.OutputBucketSeconds),
 		0,
 	).UTC()
+	complete := make(map[int64]bool)
+	for bucket := firstBucket; bucket.Before(filter.EndTime); bucket = bucket.Add(bucketDuration) {
+		ok := !bucket.Before(filter.StartTime) && !bucket.Add(bucketDuration).After(filter.EndTime)
+		for source := bucket; ok && source.Before(bucket.Add(bucketDuration)); source = source.Add(time.Duration(filter.SourceBucketSeconds) * time.Second) {
+			ok = covered[source.Unix()]
+		}
+		complete[bucket.Unix()] = ok
+		result.Partial = result.Partial || !ok
+	}
 	for _, key := range seriesOrder {
 		series := seriesByKey[key]
 		pointsByBucket := make(map[int64]*service.OpsRPMTrendPoint, len(series.Points))
@@ -269,29 +356,23 @@ ORDER BY series_rank, dimension_key, display_bucket`
 		}
 		filled := make([]*service.OpsRPMTrendPoint, 0, int(filter.EndTime.Sub(firstBucket)/bucketDuration)+1)
 		for bucket := firstBucket; bucket.Before(filter.EndTime); bucket = bucket.Add(bucketDuration) {
+			if !complete[bucket.Unix()] {
+				filled = append(filled, &service.OpsRPMTrendPoint{BucketStart: bucket, Partial: true})
+				continue
+			}
 			if point := pointsByBucket[bucket.Unix()]; point != nil {
 				filled = append(filled, point)
 				continue
 			}
-			filled = append(filled, &service.OpsRPMTrendPoint{BucketStart: bucket})
+			zero := 0.0
+			filled = append(filled, &service.OpsRPMTrendPoint{BucketStart: bucket, SuccessRPM: &zero, ErrorRPM: &zero, TotalRPM: &zero})
 		}
 		series.Points = filled
 		result.Series = append(result.Series, series)
 	}
 
-	var latest sql.NullTime
-	if err := r.db.QueryRowContext(
-		ctx,
-		`SELECT MAX(bucket_start) FROM ops_rpm_metrics WHERE bucket_seconds = $1 AND bucket_start >= $2 AND bucket_start < $3`,
-		filter.SourceBucketSeconds,
-		filter.StartTime.UTC(),
-		filter.EndTime.UTC(),
-	).Scan(&latest); err != nil {
-		return nil, err
+	if !latest.IsZero() {
+		result.CompleteThrough = &latest
 	}
-	if latest.Valid {
-		completeThrough := latest.Time.UTC().Add(time.Duration(filter.SourceBucketSeconds) * time.Second)
-		result.CompleteThrough = &completeThrough
-	}
-	return result, nil
+	return result, tx.Commit()
 }

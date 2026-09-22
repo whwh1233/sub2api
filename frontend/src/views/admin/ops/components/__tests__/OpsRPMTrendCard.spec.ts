@@ -62,6 +62,22 @@ describe('OpsRPMTrendCard', () => {
     mockGetRPMTrend.mockResolvedValue(sampleResponse)
   })
 
+  it('keeps collection gaps null while preserving collected zero traffic', async () => {
+    mockGetRPMTrend.mockResolvedValue({
+      ...sampleResponse, partial: true,
+      series: [{ ...sampleResponse.series[0], points: [
+        { ...sampleResponse.series[0].points[0], partial: true, total_rpm: null },
+        { ...sampleResponse.series[0].points[0], bucket_start: '2026-08-05T09:00:00Z', partial: false, total_rpm: 0 }
+      ] }]
+    })
+    const wrapper = mount(OpsRPMTrendCard, { global: { stubs: { EmptyState: true, HelpTooltip: true } } })
+    await flushPromises()
+    const dataset = wrapper.findComponent('.line-chart').props('data').datasets[0]
+    expect(dataset.data).toEqual([null, 0])
+    expect(dataset.spanGaps).toBe(false)
+    expect(wrapper.text()).toContain('admin.ops.rpm.partial')
+  })
+
   it('defaults to the one-hour platform trend', async () => {
     const wrapper = mount(OpsRPMTrendCard, {
       global: { stubs: { EmptyState: true, HelpTooltip: true } }

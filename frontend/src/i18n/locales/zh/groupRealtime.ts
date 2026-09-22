@@ -1,17 +1,17 @@
 export default {
   groupRealtime: {
     title: '分组实时',
-    description: '按入口分组查看实时流量与请求结果，每 5 秒自动刷新。',
-    scope: 'RPM 为最近 60 秒进入的推理请求数；成功率按最近 60 秒完成的请求计算，排除主动取消。内部重试不重复计数，WebSocket 按请求轮次统计。',
+    description: '按数据库日志中的分组查看实时统计，每 5 秒自动刷新。',
+    scope: 'RPM 为最近 60 秒已落库的用量及最终错误日志条数，正在执行的请求尚未计入。与运维报表采用日志口径：排除恢复成功的错误记录和 token 计数错误；仅将状态 499 识别为取消。日志过滤、延迟和部分流式计费会影响结果。',
     window: '统计窗口', updated: '更新时间', refresh: '刷新', pause: '暂停刷新', resume: '恢复刷新',
     paused: '已暂停', stale: '数据已过期', live: '自动刷新中', partial: '采集预热或存在采集缺口，当前数据可能不完整。',
     loadError: '实时数据获取失败，请重试；如监控已关闭，请先在运维设置中启用。',
     search: '搜索分组名称或 ID', platform: '平台', allPlatforms: '全部平台',
     totalRPM: '总 RPM', totalRate: '整体成功率', activeGroups: '有请求的分组', filtered: '当前筛选范围',
-    group: '分组', rpm: 'RPM · 进入', rate: '成功率 · 完成', success: '成功', failed: '失败', cancelled: '主动取消',
+    group: '分组', rpm: 'RPM · 日志', rate: '成功率 · 日志', success: '成功', failed: '失败', cancelled: '取消 · 499',
     sample: '样本较少', noRequests: '暂无完成请求', unknownGroup: '未归属', removedGroup: '分组 #{id}', inactive: '已停用',
     empty: '没有符合条件的分组', loading: '正在获取实时数据…',
-    details: '失败原因', detailsHint: '以下为点击时统计窗口内的最终失败数量。内部重试已排除。',
+    details: '失败原因', detailsHint: '以下为点击时窗口内的最终错误日志数量；具体原因请在运维错误日志中查看。',
     reason: '原因', count: '请求数', sortHint: '默认按 RPM 从高到低排序；刷新后按当前排序方式更新。点击列标题可切换排序。',
     sort: '排序', ascending: '升序 ↑', descending: '降序 ↓',
     history: {
@@ -34,7 +34,7 @@ export default {
       "bucket": "每 {minutes} 分钟一个统计点",
       "coverage": "完整采集 {minutes} 分钟",
       "averageRPM": "平均 RPM",
-      "rate": "历史成功率",
+      "rate": "历史日志成功率",
       "chartLabel": "多个分组的历史趋势对比",
       "chartHint": "每条曲线代表一个分组，颜色与图例一致。可切换 RPM / 成功率查看所有分组；采集缺口保留为空，无完成请求时不显示成功率。",
       "warming": "尚无完整历史数据，启用后每分钟保存一次；请等待首次落库。",
@@ -49,6 +49,7 @@ export default {
       }
 },
     reasons: {
+      logged_error: '已记录的最终错误',
       content_policy: '内容策略拒绝', authentication: '鉴权失败', context_limit: '上下文超限',
       invalid_request: '请求参数错误', model_unsupported: '模型不支持', group_access: '分组权限不足',
       quota_or_balance: '余额或配额不足', account_pool_unavailable: '无可用账号', rate_or_capacity: '限流或并发不足',

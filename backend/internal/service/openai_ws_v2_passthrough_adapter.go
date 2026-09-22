@@ -990,7 +990,6 @@ func (s *OpenAIGatewayService) proxyResponsesWebSocketV2Passthrough(
 					err := errors.New("overlapping response.create is not supported")
 					return payload, nil, NewOpenAIWSClientCloseError(coderws.StatusPolicyViolation, err.Error(), err)
 				}
-				StartGroupRealtimeTurn(c)
 				defer func() {
 					if !acceptedTurn {
 						turnLifecycle.cancelResponseCreate()

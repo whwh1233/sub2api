@@ -1,140 +1,51 @@
-# Group realtime monitoring
+# 分组实时与历史：数据库唯一数据来源
 
-The administrator sidebar has a standalone `/admin/group-realtime` page.
-It uses `GET /api/v1/admin/ops/group-realtime`, guarded by the existing admin
-authentication and Ops monitoring switch. Migration
-`238_ops_group_minute_metrics.sql` adds persistent history storage.
+## 数据流
 
-## Metric definitions
+请求仍走原有用量日志和运维错误日志的写入流程。本功能不在请求开始、结束、WebSocket turn 或鉴权路径新增计数写入。
 
-- RPM: inference requests admitted to key lookup in the last rolling 60 seconds.
-  The entry group is frozen immediately after key lookup, before routing changes
-  it. Rejections of a recognized key still belong to that key's group. Requests
-  without a recognized key are reported under group ID 0 on completion.
-- Success rate: successes / (successes + final failures) completed in that
-  window. In-flight requests and client cancellations are excluded. RPM and the
-  completed total therefore need not match. Zero completions return JSON `null`.
-- HTTP/SSE: final HTTP status, captured terminal SSE errors, explicit stream
-  error markers, cancellation and cyber policy determine the outcome. Upstream
-  attempts that recover are not separate requests.
-- Responses WebSocket: count logical turns, not the handshake or connection.
-  Retryable failures remain pending until retry success or connection exit.
-  Idle connection close does not add a success; an unfinished turn does not
-  become a success merely because the handshake returned 101.
-- Metadata, token counting, task polling, cancellation endpoints, custom voice
-  administration and live voice sessions are outside the inference counter.
-  Async image/batch/video creation measures submission success, not eventual
-  background task completion.
-- Overall success rate is weighted by completed counts, never an average of
-  group percentages. UI summary cards use the current search/platform filter.
+- 实时：查询 PostgreSQL `usage_logs` 和 `ops_error_logs` 最近 60 秒的数据；每 5 秒刷新，进程内只缓存查询结果 3 秒。
+- 历史：后台每分钟从同一组日志汇总到 PostgreSQL `ops_group_log_minute_metrics`，页面查询统计表；查询结果缓存 15 秒。
+- 不使用 Redis 保存实时或历史计数；原先的秒、分钟、五分钟 Redis 计数及请求埋点已移除。RPM 后台协调也使用 PostgreSQL advisory lock。
+- 应用其他功能仍可以使用 Redis（鉴权缓存、限流等）；这不属于本功能的统计数据来源。
 
-## Collection and storage
+## 统计口径
 
-Shared Redis keys `ops:group-realtime:v1:<unix-second>` hold bounded group / outcome
-fields, expiring after 120 seconds. Redis TIME is the common clock. The API reads
-the previous 60 complete seconds: `[floor(now)-60, floor(now))`, at most one second
-behind wall time. It joins all non-deleted groups so inactive and idle groups are
-still visible. Counters for a recently deleted group retain its numeric ID.
-The `since` marker records the beginning of collection, without backfilling old
-usage logs. The first incomplete window is labeled partial.
+RPM 表示窗口内已落库的用量及最终错误**日志条数**，以日志 `created_at` 和保存的 `group_id` 为准。正在执行、还没落库的请求尚未计入，不再表示入口到达速率。
 
-The collector does not store prompts, credentials, error bodies or individual
-request identifiers. A failed Redis write does not reject inference; the local
-instance exposes a partial-window warning for its collection gap and publishes
-a shared one-minute gap marker when Redis recovers. Reads fail
-visibly rather than returning synthetic zeroes. Admin snapshots are cached for
-three seconds per instance; counters themselves are shared across instances.
+用量日志计为成功；错误日志只计 `status_code >= 400 AND is_count_tokens = FALSE`，因此恢复成功而保存的 2xx 上游错误不计为失败。499 计为已记录的取消，其他错误计为失败。成功率 = 用量日志数 /（用量日志数 + 失败日志数），分母为零时返回 null。
 
-## UI behavior
+这与运维日志报表的数据来源一致，但不能承诺等于精确的唯一逻辑请求数：部分流式失败可能同时产生计费和错误记录，日志可能被配置过滤或延迟写入。两类日志的请求 ID 也不一定相同，因此不盲目跨表去重。取消只识别已记录的 499；未写入日志的取消不能还原。具体错误原因以运维错误日志为准。
 
-Poll every five seconds while visible and unpaused. Keep previous data on errors
-and label it stale; also label data stale after 15 seconds without a successful
-refresh. Default to RPM descending and re-sort on every successful refresh. Clicking a
-sort control selects another order, also maintained on refresh. Below 10 completed requests, show a small-sample hint.
-Clicking a failure count opens reason counts from that frozen snapshot/window;
-this is a reason breakdown, not a query of potentially filtered Ops error logs.
-Mobile uses cards; desktop uses a sortable table. Chinese and English are included.
+实时和历史共享同一个 SQL 事件定义，包含未归属组 0；活跃的空闲组仍展示，日志中已删除的分组保留名字或 ID。兼容 API 的 `started` / `started_count` 字段现在表示上述日志总数，不代表入口事件。
 
-## Verification
+## 历史持久化
 
-Unit tests cover rolling boundaries, zero groups, cancellations, entry group
-freezing, retry deduplication, WebSocket turns, terminal stream errors and collection
-failures. UI tests cover weighted rates, snapshot drilldown, descending ordering after refresh,
-stale state and hidden-page polling. Local validation must additionally use the
-repository's ten-minute production sample, embedded frontend gate and actual
-admin API checks. Never send test inference to a production-derived upstream.
+迁移 `240_ops_group_log_minute_metrics.sql` 创建独立的日志统计表。旧 `ops_group_minute_metrics` 表保留，防止把不同统计口径混在同一条曲线上；不会删除旧历史。旧 Redis 短期数据不再读写，带 TTL 的键自然过期；无 TTL 的旧标记没有自动清理。
 
-## History and recent group success rates
+后台默认从最近 5 个完整分钟开始，保留 5 分钟重叠重算来吸收迟到日志；暂停后依据数据库进度分批补齐，每批最多 15 分钟，最多追溯 24 小时。首次运行不会自动回填一周，以免集中扫描旧日志。超过重叠范围的迟到日志、已被清理的原始日志不能保证还原。
 
-`GET /api/v1/admin/ops/group-realtime/history?window_minutes=60&group_id=123`
-uses the same admin authentication and monitoring switch. Supported windows are
-15, 60, 360, and 1440 minutes. Omit `group_id` for all groups; `group_id=0` selects
-unassigned traffic. Invalid windows and negative/non-numeric IDs return 400.
-Each group includes aligned history points, so a single request supplies all
-chart lines. The optional group_id still filters aggregate points for API clients;
-the UI requests all groups and toggles lines locally.
+事务级 advisory lock 序列化多实例写入。一个事务中替换时间窗口的绝对计数并保存 group_id=-1 的覆盖标记；失败整体回滚，重复执行不会累加。覆盖只证明对日志做过扫描，不保证原始日志未被过滤/删除。无请求但扫描完成的分钟为 0，未扫描的分钟是缺口。
 
-The existing atomic Redis increment updates expiring source counters. The Ops
-collector persists closed one-minute buckets to PostgreSQL every minute, even
-when nobody has the page open. Its startup pass catches up available Redis data
-(up to 24 hours) and later passes overlap five minutes. It respects the Ops
-monitoring switches and the local background-worker disable flag.
+后台 SQL 设置 8 秒 statement_timeout 和 1 秒 lock_timeout，外层 collector 保留 20 秒 context。数据库进程冻结时网络取消仍存在此前演练发现的驱动限制，不能把 SQL 超时当作连接级隔离。统计与业务仍共用连接池，尚无自动分组历史清理任务。
 
-`ops_group_minute_metrics` has primary key `(bucket_start, group_id)`, snapshots
-of group name/platform/status, entered/success/failure/cancellation counts,
-`partial`, and `updated_at`. Group ID -1 is a per-minute coverage marker in the
-same transaction; ID 0 remains unassigned traffic. Quiet groups do not need
-individual empty rows. There is no foreign key, so deleting a group preserves
-its history. There is no automatic history deletion or retention job yet.
+## 接口与页面
 
-A PostgreSQL transaction advisory lock serializes multi-instance writers. Batch
-UPSERT writes absolute counters rather than adding them, so retries are
-idempotent; a failure rolls back the entire batch including coverage. Reported
-outage intervals also mark earlier stored buckets incomplete. After a Redis
-reset, the new collection epoch never overwrites older persisted minutes.
+- `GET /api/v1/admin/ops/group-realtime`
+- `GET /api/v1/admin/ops/group-realtime/history?window_minutes=60&group_id=123`
 
-The history API reads only PostgreSQL and stays available if Redis fails or is
-cleared. The four query windows remain 15 minutes, 1 hour, 6 hours, and 24 hours;
-longer ranges use five-minute display buckets assembled from stored minutes.
-A bucket is complete only when every constituent minute has a complete coverage
-marker. Missing and not-yet-persisted minutes remain gaps, not zero traffic.
-Persistence can trail the realtime view by roughly one to two minutes. Loss of
-Redis before a bucket is persisted can still lose that unpersisted interval;
-PostgreSQL persistence does not promise per-request exactly-once delivery.
+均要求管理员权限和监控开关。历史范围为 15 分钟、1 小时、6 小时、24 小时、7 天；周视图按 15 分钟显示。整桶覆盖不全时保留断点，平均 RPM 仅使用完整覆盖时间。
 
-RPM is arrivals divided by the duration in minutes, not completed request count.
-Success rate is successes / (successes + final failures); cancellations are
-excluded and no completions produce null. Period totals sum complete buckets;
-average RPM divides by fully covered time, and overall success rate is weighted
-by counts. Per-group history is ordered by average RPM descending, then group ID.
+页面说明明确日志口径，错误详情不再声称有请求链路的细分类别。暂停或页面隐藏时停止轮询；默认 RPM 降序，分组曲线可勾选，刷新保留选择。
 
-Collection starts when this version first records an event or the persistence
-worker initializes it. Existing retained counters can be caught up on startup. Previous traffic is not backfilled from usage/error logs because
-those logs do not have the same entry-group, retry, and event-time semantics.
-Buckets before collection starts, the first partially collected bucket, and
-recorded outage intervals are gaps: RPM and success rate are null, never zero.
-Their counts are excluded from period summaries and `covered_seconds`. After
-Redis recovers, the collector shares the unavailable interval across instances.
-As with realtime, simultaneous eviction of data without the collection marker
-cannot be distinguished from no traffic; use a Redis policy appropriate for
-retaining monitoring data.
+## 运维 RPM 覆盖
 
-The history panel refreshes every 30 seconds, obeys page visibility and the
-page-wide pause button, and marks stale data. One shared time range controls all
-groups. The chart defaults to RPM with one colored line per group; the metric
-buttons switch all lines to success rates without an API request. Accessible
-legend buttons toggle groups individually; Show all / Hide all manage visibility.
-Colors and hidden groups remain stable through polling and RPM reordering.
-Missing collection remains a gap, and idle groups have zero RPM but null rates.
-Summary cards always describe all groups, independent of hidden chart lines.
-Search in the history table is independent of the realtime table filters.
+`ops_rpm_metrics` 和 `ops_rpm_coverage` 继续使用数据库日志聚合。覆盖与计数同事务提交，缺失数据返回 null；补采最多 24 小时、每批最多 15 分钟。它按平台、模型、账号、用户统计，取消仍遵循该运维报表的错误计数口径。
 
-历史图表使用复选框列出所有分组，默认仅勾选所选范围内至少一个完整时间桶 RPM 大于 0 的分组。无流量分组默认不勾选，仍可手动选中显示曲线。自动刷新保留手动选择；切换时间范围恢复默认选择。真实采集缺口仍以断点表示，完整采集且无请求的时间桶显示 0。
+十分钟开发采样包含新旧分组统计表、RPM 表及覆盖表。
 
-历史查询最长支持最近 7 天（10080 分钟），按 15 分钟聚合，共 672 个点。仍按分钟持久保存原始计数；查询范围限制不触发数据删除。Redis 的短期缓存仅用于采集与落库，周历史直接从 PostgreSQL 查询。
+## 验证与限制
 
-## 发布前待完成的风险验证
+`TestGroupRealtimeDatabaseOnly` 不创建 Redis 客户端，验证实时窗口、日志过滤、取消、空闲组、未知/删除分组、历史落库、迟到日志重算、事务失败回滚、并发幂等、补采及旧数据保留。
 
-当前仅完成本地功能与持久化测试，尚未完成生产规模压测及数据库故障演练，不应视为可直接发布。
-统计与业务仍共用 PostgreSQL 连接池；后台落库设置 20 秒 context 超时，但事务期间还会读取 Redis。请求链路同步写 Redis 计数，失败不拒绝请求，但可能增加延迟。历史表暂无自动清理。
-发布前需评估统计连接资源隔离、数据库端 statement/lock 超时、独立停用及故障退避机制，并验证数据库断连、连接池饱和、Redis 延迟和一周数据规模下的业务影响。
+本地测试沿用本任务的十分钟样本，不重复同步。完整前端验收必须以 embed 候选验证 HTML、JS、CSS、health 和 setup。此前 Redis 版本的压力报告不是本次重构的完整验收结论；数据库资源争用与冻结取消问题仍需单独解决。任何现存发布包都必须在此重构后重新生成才包含这些变化。

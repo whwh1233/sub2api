@@ -33,9 +33,10 @@ type OpsRPMTrendPoint struct {
 	BucketStart  time.Time `json:"bucket_start"`
 	SuccessCount int64     `json:"success_count"`
 	ErrorCount   int64     `json:"error_count"`
-	SuccessRPM   float64   `json:"success_rpm"`
-	ErrorRPM     float64   `json:"error_rpm"`
-	TotalRPM     float64   `json:"total_rpm"`
+	SuccessRPM   *float64  `json:"success_rpm"`
+	ErrorRPM     *float64  `json:"error_rpm"`
+	TotalRPM     *float64  `json:"total_rpm"`
+	Partial      bool      `json:"partial"`
 }
 
 type OpsRPMTrendSeries struct {
@@ -45,6 +46,7 @@ type OpsRPMTrendSeries struct {
 }
 
 type OpsRPMTrendResponse struct {
+	Partial             bool                 `json:"partial"`
 	GeneratedAt         time.Time            `json:"generated_at"`
 	StartTime           time.Time            `json:"start_time"`
 	EndTime             time.Time            `json:"end_time"`

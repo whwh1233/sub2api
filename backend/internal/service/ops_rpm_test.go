@@ -108,3 +108,31 @@ func TestOpsRPMCollectorUsesBoundedOverlapAndCompactRollup(t *testing.T) {
 		end:    time.Date(2026, 8, 5, 3, 5, 0, 0, time.UTC),
 	}}, rollups)
 }
+
+func TestRPMCollectorResumesAfterTwentyMinutePause(t *testing.T) {
+	end := time.Date(2026, 9, 22, 8, 30, 0, 0, time.UTC)
+	progress := end.Add(-20 * time.Minute)
+	calls := 0
+	repo := &opsRepoMock{
+		GetRPMCollectionEndFn: func(_ context.Context, seconds int) (*time.Time, error) {
+			if seconds == 60 {
+				v := progress
+				return &v, nil
+			}
+			return nil, nil
+		},
+		UpsertRPMMinuteMetricsFn: func(_ context.Context, start, stop time.Time) error {
+			require.LessOrEqual(t, stop.Sub(start), 15*time.Minute)
+			require.Equal(t, progress.Add(-5*time.Minute), start)
+			progress = stop
+			calls++
+			return nil
+		},
+	}
+	collector := &OpsMetricsCollector{opsRepo: repo}
+	require.NoError(t, collector.collectAndPersistRPM(context.Background(), end))
+	require.Equal(t, end.Add(-10*time.Minute), progress)
+	require.NoError(t, collector.collectAndPersistRPM(context.Background(), end))
+	require.Equal(t, end, progress)
+	require.Equal(t, 2, calls)
+}

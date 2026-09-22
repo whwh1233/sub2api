@@ -16,6 +16,7 @@ type opsRepoMock struct {
 	InsertSystemLogCleanupAuditFn func(ctx context.Context, input *OpsSystemLogCleanupAudit) error
 	GetRPMTrendFn                 func(ctx context.Context, filter *OpsRPMTrendFilter) (*OpsRPMTrendResponse, error)
 	UpsertRPMMinuteMetricsFn      func(ctx context.Context, startTime, endTime time.Time) error
+	GetRPMCollectionEndFn         func(ctx context.Context, bucketSeconds int) (*time.Time, error)
 	UpsertRPMRollupFn             func(ctx context.Context, sourceBucketSeconds, targetBucketSeconds int, startTime, endTime time.Time) error
 	CleanupRPMMetricsFn           func(ctx context.Context, minuteCutoff, fiveMinuteCutoff, twoHourCutoff time.Time) error
 }
@@ -122,6 +123,13 @@ func (m *opsRepoMock) GetRPMTrend(ctx context.Context, filter *OpsRPMTrendFilter
 
 func (m *opsRepoMock) InsertSystemMetrics(ctx context.Context, input *OpsInsertSystemMetricsInput) error {
 	return nil
+}
+
+func (m *opsRepoMock) GetRPMCollectionEnd(ctx context.Context, bucketSeconds int) (*time.Time, error) {
+	if m.GetRPMCollectionEndFn != nil {
+		return m.GetRPMCollectionEndFn(ctx, bucketSeconds)
+	}
+	return nil, nil
 }
 
 func (m *opsRepoMock) UpsertRPMMinuteMetrics(ctx context.Context, startTime, endTime time.Time) error {

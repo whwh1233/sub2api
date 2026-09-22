@@ -33,6 +33,7 @@ type OpsRepository interface {
 
 	InsertSystemMetrics(ctx context.Context, input *OpsInsertSystemMetricsInput) error
 	UpsertRPMMinuteMetrics(ctx context.Context, startTime, endTime time.Time) error
+	GetRPMCollectionEnd(ctx context.Context, bucketSeconds int) (*time.Time, error)
 	UpsertRPMRollup(ctx context.Context, sourceBucketSeconds, targetBucketSeconds int, startTime, endTime time.Time) error
 	CleanupRPMMetrics(ctx context.Context, minuteCutoff, fiveMinuteCutoff, twoHourCutoff time.Time) error
 	GetLatestSystemMetrics(ctx context.Context, windowMinutes int) (*OpsSystemMetricsSnapshot, error)

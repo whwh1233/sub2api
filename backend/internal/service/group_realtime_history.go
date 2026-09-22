@@ -7,8 +7,7 @@ import (
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
 )
 
-// History uses the same ingress/outcome events as the realtime monitor, never
-// sampled usage/error logs (which have different retry and attribution rules).
+// History and realtime use the same persisted usage/error-log definition.
 type GroupRealtimeHistoryPersister interface {
 	PersistHistory(context.Context) error
 }
