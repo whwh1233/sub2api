@@ -24,6 +24,16 @@ local key = ARGV[1] .. now[1]
 redis.call('HINCRBY', key, ARGV[2], 1)
 redis.call('EXPIRE', key, 120)
 redis.call('SET', ARGV[1] .. 'since', now[1], 'NX')
+local metric = ARGV[2]
+-- History needs bounded outcome totals, not per-reason fields.
+metric = string.gsub(metric, ':failed:.*$', ':failed')
+for _, step in ipairs({60, 300}) do
+ local bucket = math.floor(tonumber(now[1]) / step) * step
+ local historyKey = ARGV[3] .. step .. ':' .. bucket
+ redis.call('HINCRBY', historyKey, metric, 1)
+ redis.call('EXPIRE', historyKey, 90000)
+end
+redis.call('SET', ARGV[3] .. 'since', now[1], 'NX')
 return 1
 `
 
@@ -35,10 +45,11 @@ type groupRealtimeCounterCommand struct{ *redis.Cmd }
 func (*groupRealtimeCounterCommand) NoRetry() bool { return true }
 
 type groupRealtimeCache struct {
-	rdb    *redis.Client
-	writer *redis.Client
-	db     *sql.DB
-	gap    atomic.Bool
+	rdb      *redis.Client
+	writer   *redis.Client
+	db       *sql.DB
+	gap      atomic.Bool
+	gapSince atomic.Int64
 }
 
 func NewGroupRealtimeStore(rdb *redis.Client, db *sql.DB) service.GroupRealtimeStore {
@@ -47,14 +58,15 @@ func NewGroupRealtimeStore(rdb *redis.Client, db *sql.DB) service.GroupRealtimeS
 
 func (r *groupRealtimeCache) Increment(ctx context.Context, groupID int64, metric string) error {
 	field := fmt.Sprintf("%d:%s", groupID, metric)
-	cmd := &groupRealtimeCounterCommand{redis.NewCmd(ctx, "evalsha", groupRealtimeIncrement.Hash(), 0, groupRealtimePrefix, field)}
+	cmd := &groupRealtimeCounterCommand{redis.NewCmd(ctx, "evalsha", groupRealtimeIncrement.Hash(), 0, groupRealtimePrefix, field, groupHistoryPrefix)}
 	err := r.writer.Process(ctx, cmd)
 	if redis.HasErrorPrefix(err, "NOSCRIPT") {
 		// NOSCRIPT guarantees the increment was not executed, so this fallback is safe.
-		cmd = &groupRealtimeCounterCommand{redis.NewCmd(ctx, "eval", groupRealtimeIncrementLua, 0, groupRealtimePrefix, field)}
+		cmd = &groupRealtimeCounterCommand{redis.NewCmd(ctx, "eval", groupRealtimeIncrementLua, 0, groupRealtimePrefix, field, groupHistoryPrefix)}
 		err = r.writer.Process(ctx, cmd)
 	}
 	if err != nil {
+		r.gapSince.CompareAndSwap(0, time.Now().UnixMilli())
 		r.gap.Store(true)
 		return err
 	}
@@ -65,8 +77,14 @@ func (r *groupRealtimeCache) publishGap(ctx context.Context) error {
 	if !r.gap.CompareAndSwap(true, false) {
 		return nil
 	}
-	// After recovery all instances must see that this window lost events.
-	if err := r.writer.Set(ctx, groupRealtimePrefix+"gap", "1", time.Minute).Err(); err != nil {
+	// After recovery share the full historical gap, not just the current minute.
+	since := r.gapSince.Swap(0)
+	elapsed := int64(1)
+	if since > 0 {
+		elapsed += (time.Now().UnixMilli() - since) / 1000
+	}
+	if err := r.writer.Eval(ctx, groupHistoryGapLua, nil, groupRealtimePrefix, groupHistoryPrefix, elapsed).Err(); err != nil {
+		r.gapSince.CompareAndSwap(0, since)
 		r.gap.Store(true)
 		return err
 	}

@@ -105,6 +105,34 @@ export interface OpsThroughputTrendResponse {
   top_groups?: OpsThroughputGroupBreakdownItem[]
 }
 
+export type OpsRPMDimension = 'platform' | 'model' | 'account' | 'user'
+
+export interface OpsRPMTrendPoint {
+  bucket_start: string
+  success_count: number
+  error_count: number
+  success_rpm: number
+  error_rpm: number
+  total_rpm: number
+}
+
+export interface OpsRPMTrendSeries {
+  key: string
+  label: string
+  points: OpsRPMTrendPoint[]
+}
+
+export interface OpsRPMTrendResponse {
+  generated_at: string
+  start_time: string
+  end_time: string
+  complete_through?: string | null
+  dimension: OpsRPMDimension
+  source_bucket_seconds: number
+  output_bucket_seconds: number
+  series: OpsRPMTrendSeries[]
+}
+
 export type OpsRequestKind = 'success' | 'error'
 export type OpsRequestDetailsKind = OpsRequestKind | 'all'
 export type OpsRequestDetailsSort = 'created_at_desc' | 'duration_desc'
@@ -1015,6 +1043,23 @@ export async function getThroughputTrend(
   return data
 }
 
+export async function getRPMTrend(
+  params: {
+    time_range?: '30m' | '1h' | '6h' | '24h' | '7d' | '30d'
+    start_time?: string
+    end_time?: string
+    dimension?: OpsRPMDimension
+    top_n?: number
+  },
+  options: OpsRequestOptions = {}
+): Promise<OpsRPMTrendResponse> {
+  const { data } = await apiClient.get<OpsRPMTrendResponse>('/admin/ops/dashboard/rpm-trend', {
+    params,
+    signal: options.signal
+  })
+  return data
+}
+
 export async function getLatencyHistogram(
   params: {
   time_range?: '5m' | '30m' | '1h' | '6h' | '24h'
@@ -1310,6 +1355,7 @@ export const opsAPI = {
   getDashboardSnapshotV2,
   getDashboardOverview,
   getThroughputTrend,
+  getRPMTrend,
   getLatencyHistogram,
   getErrorTrend,
   getErrorDistribution,

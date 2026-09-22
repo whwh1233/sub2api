@@ -128,6 +128,35 @@ export default {
       tpsK: 'TPS（千）',
       top: '最高：',
       throughputTrend: '吞吐趋势',
+      rpm: {
+        title: 'RPM 波动统计',
+        help: '按完成的时间桶统计请求数；成功数来自用量日志，失败数来自运维错误日志。仅管理员可查看。',
+        other: '其他',
+        platformAnthropic: 'Claude / Anthropic',
+        bucketMinute: '精度：1 分钟',
+        bucketFiveMinutes: '精度：5 分钟',
+        bucketThirtyMinutes: '精度：30 分钟',
+        bucketTwoHours: '精度：2 小时',
+        bucketSeconds: '精度：{seconds} 秒',
+        completeThrough: '数据已完整至 {time}',
+        search: '搜索当前曲线',
+        timeRange: '时间范围',
+        dimension: '统计维度',
+        metric: '指标类型',
+        failedToLoad: '加载 RPM 统计失败',
+        noData: '当前时间范围内暂无 RPM 统计数据',
+        dimensions: {
+          platform: '平台',
+          model: '模型',
+          account: '账号',
+          user: '用户'
+        },
+        metrics: {
+          total: '总 RPM',
+          success: '成功 RPM',
+          error: '失败 RPM'
+        }
+      },
       switchRateTrend: '平均账号切换趋势',
       latencyHistogram: '请求时长分布',
       errorTrend: '错误趋势',

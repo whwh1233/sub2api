@@ -67,6 +67,12 @@
         </div>
       </div>
 
+      <!-- Admin-only RPM analysis. The route and API are both protected by admin auth. -->
+      <OpsRPMTrendCard
+        v-if="opsEnabled && !(loading && !hasLoadedOnce)"
+        :refresh-token="dashboardRefreshToken"
+      />
+
       <!-- Row: Visual Analysis (baseline 3-up grid) -->
       <div v-if="opsEnabled && !(loading && !hasLoadedOnce)" class="grid grid-cols-1 gap-6 md:grid-cols-3">
         <OpsLatencyChart :latency-data="latencyHistogram" :loading="loadingLatency" />
@@ -167,6 +173,7 @@ import OpsErrorTrendChart from './components/OpsErrorTrendChart.vue'
 import OpsLatencyChart from './components/OpsLatencyChart.vue'
 import OpsThroughputTrendChart from './components/OpsThroughputTrendChart.vue'
 import OpsSwitchRateTrendChart from './components/OpsSwitchRateTrendChart.vue'
+import OpsRPMTrendCard from './components/OpsRPMTrendCard.vue'
 import OpsAlertEventsCard from './components/OpsAlertEventsCard.vue'
 import OpsOpenAITokenStatsCard from './components/OpsOpenAITokenStatsCard.vue'
 import OpsSystemLogTable from './components/OpsSystemLogTable.vue'

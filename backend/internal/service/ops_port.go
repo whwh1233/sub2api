@@ -29,8 +29,12 @@ type OpsRepository interface {
 	GetErrorTrend(ctx context.Context, filter *OpsDashboardFilter, bucketSeconds int) (*OpsErrorTrendResponse, error)
 	GetErrorDistribution(ctx context.Context, filter *OpsDashboardFilter) (*OpsErrorDistributionResponse, error)
 	GetOpenAITokenStats(ctx context.Context, filter *OpsOpenAITokenStatsFilter) (*OpsOpenAITokenStatsResponse, error)
+	GetRPMTrend(ctx context.Context, filter *OpsRPMTrendFilter) (*OpsRPMTrendResponse, error)
 
 	InsertSystemMetrics(ctx context.Context, input *OpsInsertSystemMetricsInput) error
+	UpsertRPMMinuteMetrics(ctx context.Context, startTime, endTime time.Time) error
+	UpsertRPMRollup(ctx context.Context, sourceBucketSeconds, targetBucketSeconds int, startTime, endTime time.Time) error
+	CleanupRPMMetrics(ctx context.Context, minuteCutoff, fiveMinuteCutoff, twoHourCutoff time.Time) error
 	GetLatestSystemMetrics(ctx context.Context, windowMinutes int) (*OpsSystemMetricsSnapshot, error)
 
 	UpsertJobHeartbeat(ctx context.Context, input *OpsUpsertJobHeartbeatInput) error

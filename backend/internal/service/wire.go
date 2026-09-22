@@ -509,8 +509,10 @@ func ProvideOpsMetricsCollector(
 	db *sql.DB,
 	redisClient *redis.Client,
 	cfg *config.Config,
+	groupStore GroupRealtimeStore,
 ) *OpsMetricsCollector {
 	collector := NewOpsMetricsCollector(opsRepo, settingRepo, accountRepo, concurrencyService, db, redisClient, cfg)
+	collector.groupHistory, _ = groupStore.(GroupRealtimeHistoryPersister)
 	startBackgroundWorker(collector.Start)
 	return collector
 }

@@ -39,11 +39,15 @@ type GroupRealtimeSnapshot struct {
 }
 
 type GroupRealtimeMonitor struct {
-	store    GroupRealtimeStore
-	failedAt atomic.Int64
-	cacheMu  sync.Mutex
-	cached   *GroupRealtimeSnapshot
-	cachedAt time.Time
+	store          GroupRealtimeStore
+	failedAt       atomic.Int64
+	cacheMu        sync.Mutex
+	cached         *GroupRealtimeSnapshot
+	cachedAt       time.Time
+	historyMu      sync.Mutex
+	history        *GroupRealtimeHistory
+	historyMinutes int
+	historyAt      time.Time
 }
 
 func NewGroupRealtimeMonitor(store GroupRealtimeStore) *GroupRealtimeMonitor {

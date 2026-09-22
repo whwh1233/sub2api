@@ -8,7 +8,7 @@
         </div>
         <div class="flex gap-2">
           <button type="button" class="btn btn-secondary min-h-11" @click="togglePause">{{ t(paused ? 'groupRealtime.resume' : 'groupRealtime.pause') }}</button>
-          <button type="button" class="btn btn-primary min-h-11" :disabled="loading" @click="refresh">{{ t('groupRealtime.refresh') }}</button>
+          <button type="button" class="btn btn-primary min-h-11" :disabled="loading" @click="manualRefresh">{{ t('groupRealtime.refresh') }}</button>
         </div>
       </header>
 
@@ -30,6 +30,8 @@
           <p class="mt-2 text-xs text-gray-400">{{ t('groupRealtime.filtered') }}</p>
         </div>
       </div>
+
+      <GroupHistoryPanel :paused="paused" :refresh-token="historyRefresh" />
 
       <div class="rounded-xl border border-gray-200 bg-white dark:border-dark-700 dark:bg-dark-800">
         <div class="flex flex-wrap items-end gap-3 p-4">
@@ -123,6 +125,7 @@ import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import BaseDialog from '@/components/common/BaseDialog.vue'
+import GroupHistoryPanel from '@/components/admin/group/GroupHistoryPanel.vue'
 import { getGroupRealtime, type GroupRealtimeRow, type GroupRealtimeSnapshot } from '@/api/admin/groupRealtime'
 
 const { t, te, locale } = useI18n()
@@ -138,7 +141,7 @@ const details = ref<{ row: GroupRealtimeRow; start: string; end: string } | null
 type SortKey = 'group_name' | 'rpm' | 'success_rate' | 'success' | 'failed' | 'cancelled'
 const sortKey = ref<SortKey>('rpm')
 const sortDesc = ref(true)
-const order = ref<number[]>([])
+const historyRefresh = ref(0)
 const columns: { key: SortKey; label: string }[] = [
   { key: 'group_name', label: 'groupRealtime.group' }, { key: 'rpm', label: 'groupRealtime.rpm' },
   { key: 'success_rate', label: 'groupRealtime.rate' }, { key: 'success', label: 'groupRealtime.success' },
@@ -150,10 +153,7 @@ const filtered = computed(() => (snapshot.value?.groups ?? []).filter(row =>
   (!platform.value || row.platform === platform.value) &&
   `${groupName(row)} ${row.group_id}`.toLocaleLowerCase().includes(search.value.trim().toLocaleLowerCase()),
 ))
-const rows = computed(() => {
-  const ranks = new Map(order.value.map((id, index) => [id, index]))
-  return [...filtered.value].sort((a, b) => (ranks.get(a.group_id) ?? Infinity) - (ranks.get(b.group_id) ?? Infinity))
-})
+const rows = computed(() => [...filtered.value].sort(compareRows))
 const cards = computed(() => {
   const totals = filtered.value.reduce((sum, row) => ({ rpm: sum.rpm + row.rpm, success: sum.success + row.success, failed: sum.failed + row.failed, active: sum.active + Number(row.rpm > 0) }), { rpm: 0, success: 0, failed: 0, active: 0 })
   return [
@@ -166,19 +166,17 @@ function number(value: number) { return value.toLocaleString(locale.value) }
 function rate(value: number | null) { return value === null ? '—' : `${value.toLocaleString(locale.value, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%` }
 function formatTime(value: string) { return new Date(value).toLocaleTimeString(locale.value, { hour12: false }) }
 function groupName(row: GroupRealtimeRow) { return row.group_name || t(row.group_id ? 'groupRealtime.removedGroup' : 'groupRealtime.unknownGroup', { id: row.group_id }) }
-function reorder() {
-  order.value = [...(snapshot.value?.groups ?? [])].sort((a, b) => {
-    const av = a[sortKey.value], bv = b[sortKey.value]
-    if (av === null) return bv === null ? a.group_id - b.group_id : 1
-    if (bv === null) return -1
-    const diff = typeof av === 'string' && typeof bv === 'string' ? av.localeCompare(bv) : Number(av) - Number(bv)
-    return (sortDesc.value ? -diff : diff) || a.group_id - b.group_id
-  }).map(row => row.group_id)
+function compareRows(a: GroupRealtimeRow, b: GroupRealtimeRow) {
+  const av = a[sortKey.value], bv = b[sortKey.value]
+  if (av === null) return bv === null ? a.group_id - b.group_id : 1
+  if (bv === null) return -1
+  const diff = typeof av === 'string' && typeof bv === 'string' ? av.localeCompare(bv) : Number(av) - Number(bv)
+  return (sortDesc.value ? -diff : diff) || a.group_id - b.group_id
 }
+function manualRefresh() { historyRefresh.value++; void refresh() }
 function sortBy(key: SortKey) {
   sortDesc.value = key === sortKey.value ? !sortDesc.value : key !== 'group_name'
   sortKey.value = key
-  reorder()
 }
 function openDetails(row: GroupRealtimeRow) {
   if (snapshot.value) details.value = { row: { ...row, failures: { ...row.failures } }, start: snapshot.value.start_time, end: snapshot.value.end_time }
@@ -196,12 +194,6 @@ async function refresh() {
     const data = await getGroupRealtime(controller.signal)
     if (disposed) return
     snapshot.value = data
-    if (!order.value.length) reorder()
-    else {
-      const present = new Set(data.groups.map(row => row.group_id))
-      const existing = new Set(order.value)
-      order.value = [...order.value.filter(id => present.has(id)), ...data.groups.filter(row => !existing.has(row.group_id)).map(row => row.group_id)]
-    }
     lastReceived.value = Date.now()
     error.value = false
   } catch {

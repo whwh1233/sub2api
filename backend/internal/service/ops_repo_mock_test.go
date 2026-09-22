@@ -14,6 +14,10 @@ type opsRepoMock struct {
 	ListSystemLogsFn              func(ctx context.Context, filter *OpsSystemLogFilter) (*OpsSystemLogList, error)
 	DeleteSystemLogsFn            func(ctx context.Context, filter *OpsSystemLogCleanupFilter) (int64, error)
 	InsertSystemLogCleanupAuditFn func(ctx context.Context, input *OpsSystemLogCleanupAudit) error
+	GetRPMTrendFn                 func(ctx context.Context, filter *OpsRPMTrendFilter) (*OpsRPMTrendResponse, error)
+	UpsertRPMMinuteMetricsFn      func(ctx context.Context, startTime, endTime time.Time) error
+	UpsertRPMRollupFn             func(ctx context.Context, sourceBucketSeconds, targetBucketSeconds int, startTime, endTime time.Time) error
+	CleanupRPMMetricsFn           func(ctx context.Context, minuteCutoff, fiveMinuteCutoff, twoHourCutoff time.Time) error
 }
 
 func (m *opsRepoMock) InsertErrorLog(ctx context.Context, input *OpsInsertErrorLogInput) (int64, error) {
@@ -109,7 +113,35 @@ func (m *opsRepoMock) GetOpenAITokenStats(ctx context.Context, filter *OpsOpenAI
 	return &OpsOpenAITokenStatsResponse{}, nil
 }
 
+func (m *opsRepoMock) GetRPMTrend(ctx context.Context, filter *OpsRPMTrendFilter) (*OpsRPMTrendResponse, error) {
+	if m.GetRPMTrendFn != nil {
+		return m.GetRPMTrendFn(ctx, filter)
+	}
+	return &OpsRPMTrendResponse{}, nil
+}
+
 func (m *opsRepoMock) InsertSystemMetrics(ctx context.Context, input *OpsInsertSystemMetricsInput) error {
+	return nil
+}
+
+func (m *opsRepoMock) UpsertRPMMinuteMetrics(ctx context.Context, startTime, endTime time.Time) error {
+	if m.UpsertRPMMinuteMetricsFn != nil {
+		return m.UpsertRPMMinuteMetricsFn(ctx, startTime, endTime)
+	}
+	return nil
+}
+
+func (m *opsRepoMock) UpsertRPMRollup(ctx context.Context, sourceBucketSeconds, targetBucketSeconds int, startTime, endTime time.Time) error {
+	if m.UpsertRPMRollupFn != nil {
+		return m.UpsertRPMRollupFn(ctx, sourceBucketSeconds, targetBucketSeconds, startTime, endTime)
+	}
+	return nil
+}
+
+func (m *opsRepoMock) CleanupRPMMetrics(ctx context.Context, minuteCutoff, fiveMinuteCutoff, twoHourCutoff time.Time) error {
+	if m.CleanupRPMMetricsFn != nil {
+		return m.CleanupRPMMetricsFn(ctx, minuteCutoff, fiveMinuteCutoff, twoHourCutoff)
+	}
 	return nil
 }
 

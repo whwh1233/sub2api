@@ -197,6 +197,7 @@ func registerOpsRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 		ops.GET("/account-availability", h.Admin.Ops.GetAccountAvailability)
 		ops.GET("/realtime-traffic", h.Admin.Ops.GetRealtimeTrafficSummary)
 		ops.GET("/group-realtime", h.Admin.Ops.GetGroupRealtime)
+		ops.GET("/group-realtime/history", h.Admin.Ops.GetGroupRealtimeHistory)
 
 		// Alerts (rules + events)
 		ops.GET("/alert-rules", h.Admin.Ops.ListAlertRules)
@@ -272,6 +273,7 @@ func registerOpsRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 		ops.GET("/dashboard/snapshot-v2", h.Admin.Ops.GetDashboardSnapshotV2)
 		ops.GET("/dashboard/overview", h.Admin.Ops.GetDashboardOverview)
 		ops.GET("/dashboard/throughput-trend", h.Admin.Ops.GetDashboardThroughputTrend)
+		ops.GET("/dashboard/rpm-trend", h.Admin.Ops.GetDashboardRPMTrend)
 		ops.GET("/dashboard/latency-histogram", h.Admin.Ops.GetDashboardLatencyHistogram)
 		ops.GET("/dashboard/error-trend", h.Admin.Ops.GetDashboardErrorTrend)
 		ops.GET("/dashboard/error-distribution", h.Admin.Ops.GetDashboardErrorDistribution)

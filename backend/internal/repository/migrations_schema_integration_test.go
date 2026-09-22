@@ -164,6 +164,18 @@ WHERE ns.nspname = 'public'
 	requireIndex(t, tx, "ops_ingress_reject_aggregates", "idx_ops_ingress_reject_aggregates_bucket")
 	requireIndex(t, tx, "ops_ingress_reject_aggregates", "idx_ops_ingress_reject_aggregates_ip_bucket")
 
+	// Admin-only RPM rollups keep dashboard reads off request-level logs.
+	requireColumn(t, tx, "ops_rpm_metrics", "bucket_start", "timestamp with time zone", 0, false)
+	requireColumn(t, tx, "ops_rpm_metrics", "bucket_seconds", "integer", 0, false)
+	requireColumn(t, tx, "ops_rpm_metrics", "dimension_type", "character varying", 24, false)
+	requireColumn(t, tx, "ops_rpm_metrics", "dimension_key", "character varying", 255, false)
+	requireColumn(t, tx, "ops_rpm_metrics", "dimension_label", "text", 0, false)
+	requireColumn(t, tx, "ops_rpm_metrics", "success_count", "bigint", 0, false)
+	requireColumn(t, tx, "ops_rpm_metrics", "error_count", "bigint", 0, false)
+	requireIndex(t, tx, "ops_rpm_metrics", "idx_ops_rpm_metrics_unique_bucket_dimension")
+	requireIndex(t, tx, "ops_rpm_metrics", "idx_ops_rpm_metrics_dimension_time")
+	requireIndex(t, tx, "ops_rpm_metrics", "idx_ops_rpm_metrics_bucket_time")
+
 	// user_allowed_groups table should exist
 	var uagRegclass sql.NullString
 	require.NoError(t, tx.QueryRowContext(context.Background(), "SELECT to_regclass('public.user_allowed_groups')").Scan(&uagRegclass))

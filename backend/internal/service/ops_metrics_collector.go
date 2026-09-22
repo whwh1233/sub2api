@@ -31,22 +31,35 @@ const (
 
 	opsMetricsCollectorLeaderLockKey = "ops:metrics:collector:leader"
 	opsMetricsCollectorLeaderLockTTL = 90 * time.Second
+	opsRPMCollectorJobName           = "ops_rpm_collector"
+	opsRPMCollectorInterval          = 60 * time.Second
+	opsRPMCollectorTimeout           = 10 * time.Second
+	opsRPMCollectorLeaderLockKey     = "ops:rpm:collector:leader"
+	opsRPMCollectorLeaderLockTTL     = 90 * time.Second
 
 	opsMetricsCollectorHeartbeatTimeout = 2 * time.Second
+	opsRPMMinuteOverlap                 = 5 * time.Minute
+	opsRPMMinuteRetention               = 7 * 24 * time.Hour
+	opsRPMFiveMinuteRetention           = 30 * 24 * time.Hour
+	opsRPMTwoHourRetention              = 180 * 24 * time.Hour
 
 	bytesPerMB = 1024 * 1024
 )
 
-var opsMetricsCollectorAdvisoryLockID = hashAdvisoryLockID(opsMetricsCollectorLeaderLockKey)
+var (
+	opsMetricsCollectorAdvisoryLockID = hashAdvisoryLockID(opsMetricsCollectorLeaderLockKey)
+	opsRPMCollectorAdvisoryLockID     = hashAdvisoryLockID(opsRPMCollectorLeaderLockKey)
+)
 
 type opsSchedulableAccountLoadRepository interface {
 	ListSchedulableAccountLoads(ctx context.Context) ([]AccountWithConcurrency, error)
 }
 
 type OpsMetricsCollector struct {
-	opsRepo     OpsRepository
-	settingRepo SettingRepository
-	cfg         *config.Config
+	groupHistory GroupRealtimeHistoryPersister
+	opsRepo      OpsRepository
+	settingRepo  SettingRepository
+	cfg          *config.Config
 
 	accountRepo        AccountRepository
 	concurrencyService *ConcurrencyService
@@ -113,15 +126,22 @@ func (c *OpsMetricsCollector) Stop() {
 func (c *OpsMetricsCollector) run() {
 	// First run immediately so the dashboard has data soon after startup.
 	c.collectOnce()
+	c.collectRPMOnce()
+	c.collectGroupHistoryOnce()
 
+	metricsTimer := time.NewTimer(c.getInterval())
+	rpmTicker := time.NewTicker(opsRPMCollectorInterval)
+	defer metricsTimer.Stop()
+	defer rpmTicker.Stop()
 	for {
-		interval := c.getInterval()
-		timer := time.NewTimer(interval)
 		select {
-		case <-timer.C:
+		case <-metricsTimer.C:
 			c.collectOnce()
+			metricsTimer.Reset(c.getInterval())
+		case <-rpmTicker.C:
+			c.collectRPMOnce()
+			c.collectGroupHistoryOnce()
 		case <-c.stopCh:
-			timer.Stop()
 			return
 		}
 	}
@@ -365,6 +385,90 @@ func (c *OpsMetricsCollector) collectAndPersist(ctx context.Context) error {
 	}
 
 	return c.opsRepo.InsertSystemMetrics(ctx, input)
+}
+
+func (c *OpsMetricsCollector) collectRPMOnce() {
+	if c == nil || c.opsRepo == nil || c.db == nil {
+		return
+	}
+	if c.cfg != nil && !c.cfg.Ops.Enabled {
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), opsRPMCollectorTimeout)
+	defer cancel()
+	if !c.isMonitoringEnabled(ctx) {
+		return
+	}
+
+	release, ok := c.tryAcquireNamedLeaderLock(
+		ctx,
+		opsRPMCollectorLeaderLockKey,
+		opsRPMCollectorLeaderLockTTL,
+		opsRPMCollectorAdvisoryLockID,
+	)
+	if !ok {
+		return
+	}
+	if release != nil {
+		defer release()
+	}
+
+	startedAt := time.Now().UTC()
+	err := c.collectAndPersistRPM(ctx, startedAt.Truncate(time.Minute))
+	finishedAt := time.Now().UTC()
+	durationMs := finishedAt.Sub(startedAt).Milliseconds()
+	runAt := startedAt
+
+	heartbeat := &OpsUpsertJobHeartbeatInput{
+		JobName:        opsRPMCollectorJobName,
+		LastRunAt:      &runAt,
+		LastDurationMs: &durationMs,
+	}
+	if err != nil {
+		message := truncateString(err.Error(), 2048)
+		heartbeat.LastErrorAt = &finishedAt
+		heartbeat.LastError = &message
+		log.Printf("[OpsRPMCollector] collect failed: %v", err)
+	} else {
+		heartbeat.LastSuccessAt = &finishedAt
+	}
+	heartbeatCtx, heartbeatCancel := context.WithTimeout(context.Background(), opsMetricsCollectorHeartbeatTimeout)
+	defer heartbeatCancel()
+	_ = c.opsRepo.UpsertJobHeartbeat(heartbeatCtx, heartbeat)
+}
+
+func (c *OpsMetricsCollector) collectAndPersistRPM(ctx context.Context, windowEnd time.Time) error {
+	// Recompute a short overlap to heal delayed writes and brief collector pauses
+	// without adding any work to the request path.
+	if err := c.opsRepo.UpsertRPMMinuteMetrics(ctx, windowEnd.Add(-opsRPMMinuteOverlap), windowEnd); err != nil {
+		return fmt.Errorf("upsert RPM minute metrics: %w", err)
+	}
+
+	// Coarser retention tiers are derived exclusively from the compact minute
+	// table; they never rescan request logs.
+	fiveMinuteEnd := windowEnd.Truncate(5 * time.Minute)
+	if err := c.opsRepo.UpsertRPMRollup(ctx, 60, 300, fiveMinuteEnd.Add(-5*time.Minute), fiveMinuteEnd); err != nil {
+		return fmt.Errorf("upsert RPM five-minute rollup: %w", err)
+	}
+	if windowEnd.Minute()%10 == 0 {
+		twoHourEnd := windowEnd.Truncate(2 * time.Hour)
+		if err := c.opsRepo.UpsertRPMRollup(ctx, 300, 7200, twoHourEnd.Add(-2*time.Hour), twoHourEnd); err != nil {
+			return fmt.Errorf("upsert RPM two-hour rollup: %w", err)
+		}
+	}
+	if windowEnd.Hour() == 2 && windowEnd.Minute() < 5 {
+		if err := c.opsRepo.CleanupRPMMetrics(
+			ctx,
+			windowEnd.Add(-opsRPMMinuteRetention),
+			windowEnd.Add(-opsRPMFiveMinuteRetention),
+			windowEnd.Add(-opsRPMTwoHourRetention),
+		); err != nil {
+			return fmt.Errorf("cleanup RPM metrics: %w", err)
+		}
+	}
+
+	return nil
 }
 
 func (c *OpsMetricsCollector) collectConcurrencyQueueDepth(parentCtx context.Context) *int {
@@ -885,6 +989,20 @@ return 0
 `)
 
 func (c *OpsMetricsCollector) tryAcquireLeaderLock(ctx context.Context) (func(), bool) {
+	return c.tryAcquireNamedLeaderLock(
+		ctx,
+		opsMetricsCollectorLeaderLockKey,
+		opsMetricsCollectorLeaderLockTTL,
+		opsMetricsCollectorAdvisoryLockID,
+	)
+}
+
+func (c *OpsMetricsCollector) tryAcquireNamedLeaderLock(
+	ctx context.Context,
+	lockKey string,
+	lockTTL time.Duration,
+	advisoryLockID int64,
+) (func(), bool) {
 	if c == nil || c.redisClient == nil {
 		return nil, true
 	}
@@ -892,11 +1010,11 @@ func (c *OpsMetricsCollector) tryAcquireLeaderLock(ctx context.Context) (func(),
 		ctx = context.Background()
 	}
 
-	ok, err := c.redisClient.SetNX(ctx, opsMetricsCollectorLeaderLockKey, c.instanceID, opsMetricsCollectorLeaderLockTTL).Result()
+	ok, err := c.redisClient.SetNX(ctx, lockKey, c.instanceID, lockTTL).Result()
 	if err != nil {
 		// Prefer fail-closed to avoid stampeding the database when Redis is flaky.
 		// Fallback to a DB advisory lock when Redis is present but unavailable.
-		release, ok := tryAcquireDBAdvisoryLock(ctx, c.db, opsMetricsCollectorAdvisoryLockID)
+		release, ok := tryAcquireDBAdvisoryLock(ctx, c.db, advisoryLockID)
 		if !ok {
 			c.maybeLogSkip()
 			return nil, false
@@ -911,7 +1029,7 @@ func (c *OpsMetricsCollector) tryAcquireLeaderLock(ctx context.Context) (func(),
 	release := func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		defer cancel()
-		_, _ = opsMetricsCollectorReleaseScript.Run(ctx, c.redisClient, []string{opsMetricsCollectorLeaderLockKey}, c.instanceID).Result()
+		_, _ = opsMetricsCollectorReleaseScript.Run(ctx, c.redisClient, []string{lockKey}, c.instanceID).Result()
 	}
 	return release, true
 }
@@ -967,4 +1085,20 @@ func intPtr(v int) *int {
 func float64Ptr(v float64) *float64 {
 	out := v
 	return &out
+}
+
+// Persist independently of log-derived RPM aggregation. The store serializes
+// writers across instances and atomically commits coverage with group counts.
+func (c *OpsMetricsCollector) collectGroupHistoryOnce() {
+	if c == nil || c.groupHistory == nil || (c.cfg != nil && !c.cfg.Ops.Enabled) {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	if !c.isMonitoringEnabled(ctx) {
+		return
+	}
+	if err := c.groupHistory.PersistHistory(ctx); err != nil {
+		log.Printf("[OpsMetricsCollector] group history persistence failed: %v", err)
+	}
 }

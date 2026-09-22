@@ -95,6 +95,59 @@ func (h *OpsHandler) GetDashboardThroughputTrend(c *gin.Context) {
 	response.Success(c, data)
 }
 
+// GetDashboardRPMTrend returns completed RPM buckets grouped by an admin-only
+// dimension. Data comes from bounded background rollups, never a request-time
+// scan of usage_logs or ops_error_logs.
+// GET /api/v1/admin/ops/dashboard/rpm-trend
+func (h *OpsHandler) GetDashboardRPMTrend(c *gin.Context) {
+	if h.opsService == nil {
+		response.Error(c, http.StatusServiceUnavailable, "Ops service not available")
+		return
+	}
+	if err := h.opsService.RequireMonitoringEnabled(c.Request.Context()); err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+
+	startTime, endTime, err := parseOpsTimeRange(c, "1h")
+	if err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+
+	dimension := service.ParseOpsRPMDimension(strings.ToLower(strings.TrimSpace(c.Query("dimension"))))
+	if dimension == "" {
+		if strings.TrimSpace(c.Query("dimension")) == "" {
+			dimension = service.OpsRPMDimensionPlatform
+		} else {
+			response.BadRequest(c, "Invalid dimension")
+			return
+		}
+	}
+
+	topN := 10
+	if raw := strings.TrimSpace(c.Query("top_n")); raw != "" {
+		value, err := strconv.Atoi(raw)
+		if err != nil || value <= 0 || value > 20 {
+			response.BadRequest(c, "Invalid top_n")
+			return
+		}
+		topN = value
+	}
+
+	data, err := h.opsService.GetRPMTrend(c.Request.Context(), &service.OpsRPMTrendFilter{
+		StartTime: startTime,
+		EndTime:   endTime,
+		Dimension: dimension,
+		TopN:      topN,
+	})
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, data)
+}
+
 // GetDashboardLatencyHistogram returns the latency distribution histogram (success requests).
 // GET /api/v1/admin/ops/dashboard/latency-histogram
 func (h *OpsHandler) GetDashboardLatencyHistogram(c *gin.Context) {

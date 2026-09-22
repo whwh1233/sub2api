@@ -38,7 +38,7 @@ describe('GroupRealtimeView', () => {
   async function render() {
     wrapper = mount(GroupRealtimeView, {
       global: {
-        stubs: { AppLayout: { template: '<main><slot /></main>' }, BaseDialog: { props: ['show'], template: '<aside v-if="show"><slot /></aside>' } },
+        stubs: { GroupHistoryPanel: true, AppLayout: { template: '<main><slot /></main>' }, BaseDialog: { props: ['show'], template: '<aside v-if="show"><slot /></aside>' } },
       },
     })
     await flushPromises()
@@ -53,7 +53,7 @@ describe('GroupRealtimeView', () => {
     expect(view.find('tbody').text()).not.toContain('Alpha')
     expect(view.find('tbody').text()).toContain('Idle')
   })
-  it('preserves row order on refresh and freezes the failure detail window', async () => {
+  it('re-sorts by RPM on refresh and freezes the failure detail window', async () => {
     const view = await render()
     await view.find('button[aria-label="Alpha · Failure reasons"]').trigger('click')
     expect(view.find('aside').text()).toContain('Timeout')
@@ -64,7 +64,7 @@ describe('GroupRealtimeView', () => {
     fetchSnapshot.mockResolvedValue(next)
     await vi.advanceTimersByTimeAsync(5000)
     await flushPromises()
-    expect(view.find('tbody tr').text()).toContain('Alpha')
+    expect(view.find('tbody tr').text()).toContain('Beta')
     expect(view.find('aside').text()).toContain('Timeout')
     expect(view.find('aside').text()).not.toContain('Internal error')
   })

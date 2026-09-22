@@ -128,6 +128,35 @@ export default {
       tpsK: 'TPS (K)',
       top: 'Top:',
       throughputTrend: 'Throughput Trend',
+      rpm: {
+        title: 'RPM Trends',
+        help: 'Counts requests in completed time buckets. Successes come from usage logs and failures from ops error logs. Admins only.',
+        other: 'Other',
+        platformAnthropic: 'Claude / Anthropic',
+        bucketMinute: 'Resolution: 1 minute',
+        bucketFiveMinutes: 'Resolution: 5 minutes',
+        bucketThirtyMinutes: 'Resolution: 30 minutes',
+        bucketTwoHours: 'Resolution: 2 hours',
+        bucketSeconds: 'Resolution: {seconds} seconds',
+        completeThrough: 'Complete through {time}',
+        search: 'Search visible series',
+        timeRange: 'Time range',
+        dimension: 'Breakdown dimension',
+        metric: 'Metric',
+        failedToLoad: 'Failed to load RPM trends',
+        noData: 'No RPM data is available for this time range',
+        dimensions: {
+          platform: 'Platform',
+          model: 'Model',
+          account: 'Account',
+          user: 'User'
+        },
+        metrics: {
+          total: 'Total RPM',
+          success: 'Success RPM',
+          error: 'Error RPM'
+        }
+      },
       switchRateTrend: 'Avg Account Switches',
       latencyHistogram: 'Request Duration Histogram',
       errorTrend: 'Error Trend',
