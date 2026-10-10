@@ -1,0 +1,23 @@
+{
+  "purpose": "Preserve the existing Claude Fable 5.1 max tariff across the v0.2.15 upgrade",
+  "group_ids": [7, 9, 47],
+  "expected_platform": "anthropic",
+  "before_upgrade_card": {
+    "models": ["claude-fable-5-1", "claude-fable-5-1-*"],
+    "billing_mode": "token",
+    "max_reasoning_effort_multiplier": 3
+  },
+  "after_upgrade_card": {
+    "models": ["claude-fable-5-1", "claude-fable-5-1-*"],
+    "billing_mode": "token",
+    "reasoning_effort_multipliers": {"max": 3}
+  },
+  "deployment_notes": [
+    "Production writes require a separately confirmed release step.",
+    "Read and merge existing group model_pricing before writing; do not replace unrelated entries or operator overrides.",
+    "Apply the legacy card before the old service is replaced, so there is no interval charging max at 1x.",
+    "Migration 239 converts the legacy explicit multiplier to the new map; read it back after migration.",
+    "Leave token prices unspecified to inherit the catalog, and preserve the group's existing rate_multiplier and long_context_pricing_enabled.",
+    "This card matches the canonical model and its dated variants; review any additional model aliases before release."
+  ]
+}

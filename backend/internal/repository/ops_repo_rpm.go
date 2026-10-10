@@ -127,8 +127,8 @@ func (r *opsRepository) UpsertRPMRollup(
 	if !startTime.Before(endTime) {
 		return nil
 	}
-	if !((sourceBucketSeconds == 60 && targetBucketSeconds == 300) ||
-		(sourceBucketSeconds == 300 && targetBucketSeconds == 7200)) {
+	if (sourceBucketSeconds != 60 || targetBucketSeconds != 300) &&
+		(sourceBucketSeconds != 300 || targetBucketSeconds != 7200) {
 		return fmt.Errorf("unsupported RPM rollup %d -> %d", sourceBucketSeconds, targetBucketSeconds)
 	}
 

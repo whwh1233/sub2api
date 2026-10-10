@@ -86,10 +86,12 @@ vi.mock('@/stores', () => ({
   }),
 }))
 
-vi.mock('@/utils/featureFlags', () => ({
+vi.mock('@/utils/featureFlags', async (importOriginal) => ({
+  ...await importOriginal<typeof import('@/utils/featureFlags')>(),
   FeatureFlags: {
     channelMonitor: 'channelMonitor',
     payment: 'payment',
+    subscription: 'subscription',
     availableChannels: 'availableChannels',
     affiliate: 'affiliate',
     riskControl: 'riskControl',
@@ -232,5 +234,23 @@ describe('AppSidebar user navigation order', () => {
       '邀请返利',
       '个人资料',
     ])
+  })
+})
+
+describe('AppSidebar subscription feature flag', () => {
+  it('gates the My Subscriptions entry behind the subscription public-settings flag', () => {
+    expect(componentSource).toContain('const flagSubscription = makeSidebarFlag(FeatureFlags.subscription)')
+    expect(componentSource).toMatch(/path: '\/subscriptions'[^\n]*featureFlag: flagSubscription/)
+  })
+
+  it('also hides the admin Subscription Management entry on recharge-only sites', () => {
+    expect(componentSource).toMatch(/path: '\/admin\/subscriptions'[^\n]*featureFlag: flagSubscription/)
+  })
+
+  it('derives the purchase entry label from the site billing mode', () => {
+    expect(componentSource).toContain("import { resolveSiteBillingMode } from '@/utils/siteBillingMode'")
+    expect(componentSource).toMatch(/case 'recharge_only':\s*return t\('nav\.recharge'\)/)
+    expect(componentSource).toMatch(/case 'subscription_only':\s*return t\('nav\.subscribe'\)/)
+    expect(componentSource).toMatch(/path: '\/purchase'[^\n]*label: purchaseNavLabel\.value/)
   })
 })

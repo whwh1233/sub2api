@@ -11,6 +11,20 @@ type validationExpiryRepository struct {
 	calls chan struct{}
 }
 
+func TestClaudeCodeVersionSyncProviderDisabledForValidation(t *testing.T) {
+	t.Setenv("SERVER_DISABLE_BACKGROUND_WORKERS", "true")
+	repo := newClaudeCodeVersionSyncSettingRepoStub(nil)
+	client := &claudeCodeVersionSyncGitHubStub{
+		latest: &GitHubRelease{TagName: "v2.1.999"},
+	}
+	svc := ProvideClaudeCodeVersionSyncService(repo, &SettingService{}, client)
+	// Stop joins any accidentally started initial sync before checking effects.
+	svc.Stop()
+	if client.latestCalls != 0 || client.calls != 0 || len(repo.syncedWrites()) != 0 {
+		t.Fatal("local validation started Claude version synchronization")
+	}
+}
+
 func (r *validationExpiryRepository) AutoPauseExpiredAccounts(context.Context, time.Time) (int64, error) {
 	r.calls <- struct{}{}
 	return 0, nil

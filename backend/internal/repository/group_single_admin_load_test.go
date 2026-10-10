@@ -63,7 +63,8 @@ func TestGroupSingleAdminLoad(t *testing.T) {
 	_, err = db.Exec("ANALYZE")
 	require.NoError(t, err)
 	t.Log("SEED groups=10 accounts=551 users=1012 usage_rows=403200 group_history_rows=110880 rpm_rows=30240 seven_days average=40RPM")
-	store := NewGroupRealtimeStore(db).(*groupRealtimeStore)
+	store, ok := NewGroupRealtimeStore(db).(*groupRealtimeStore)
+	require.True(t, ok)
 	repo := &opsRepository{db: db}
 	for _, phase := range []struct {
 		name     string

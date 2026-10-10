@@ -60,15 +60,18 @@ func (r *groupRealtimeStore) History(ctx context.Context, minutes int, groupID *
 	for rows.Next() {
 		row := &service.GroupRealtimeHistoryRow{Points: make([]service.GroupRealtimeHistoryPoint, count)}
 		if err := rows.Scan(&row.GroupID, &row.GroupName, &row.Platform, &row.Status); err != nil {
-			rows.Close()
+			_ = rows.Close()
 			return nil, err
 		}
 		byID[row.GroupID] = row
 	}
 	err = rows.Err()
-	rows.Close()
+	closeErr := rows.Close()
 	if err != nil {
 		return nil, err
+	}
+	if closeErr != nil {
+		return nil, closeErr
 	}
 	// Coverage and counts share one MVCC statement, so a partial flush can never
 	// expose a complete marker without the corresponding group data.
@@ -81,7 +84,7 @@ func (r *groupRealtimeStore) History(ctx context.Context, minutes int, groupID *
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	covered := make([]bool, count)
 	for rows.Next() {
 		var record groupHistoryDBRow
