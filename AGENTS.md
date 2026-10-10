@@ -47,6 +47,16 @@ must be built or run with the `embed` build tag, and validation must include the
 HTML root page plus its referenced JavaScript and CSS assets as described in
 `docs/UPGRADE_RUNBOOK.md`.
 
+## Production Backup Scope
+
+As explicitly requested on 2026-10-10, production PostgreSQL backups (manual and
+scheduled) exclude **data only** from `public.prompt_audit_events`. Preserve its
+schema and preserve all data in every other table, including users/balances,
+usage records, billing records, accounts, groups, settings, and audit jobs.
+Include audit-event history only if the user explicitly requests it again.
+This production backup policy is separate from the ten-minute development sample.
+Restoring a backup with this exclusion leaves audit-event history empty.
+
 ## Production Release Confirmation
 
 For any online production release, deployment, restart, rollback, push-to-main, or VPS-side change, do not execute the whole flow autonomously.

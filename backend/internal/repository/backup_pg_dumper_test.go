@@ -6,6 +6,7 @@ import (
 	"io"
 	"os/exec"
 	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
@@ -51,6 +52,12 @@ func TestPgDumperHoldsMigrationLockThroughReaderClose(t *testing.T) {
 		commandCreated = true
 		require.Equal(t, "pg_dump", name)
 		require.Contains(t, args, "--clean")
+		require.Contains(t, args, "--exclude-table-data=public.prompt_audit_events")
+		for _, arg := range args {
+			if strings.HasPrefix(arg, "--exclude") {
+				require.Equal(t, "--exclude-table-data=public.prompt_audit_events", arg, "preserve schema and all other data")
+			}
+		}
 		require.NoError(t, mock.ExpectationsWereMet(), "migration lock must be acquired before pg_dump is created")
 		return exec.CommandContext(ctx, "sh", "-c", "printf backup-data")
 	})

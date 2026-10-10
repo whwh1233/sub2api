@@ -83,7 +83,10 @@ export default {
 
     backup: {
       title: 'Database Backup',
-      description: 'Full database backup to S3-compatible storage with scheduled backup and restore',
+      description: 'Business database backup to S3-compatible storage with scheduled backup and restore',
+      scopeDescription: 'New backups include users, balances, usage records and other business data. Prompt audit records are excluded; their table schema is retained.',
+      auditDataExcluded: 'Prompt audit records excluded',
+      restoreWithoutAuditConfirm: 'Restore this backup? This will overwrite the current database and leave prompt audit records empty.',
       s3: {
         title: 'S3 Storage Configuration',
         description: 'Configure S3-compatible storage (supports Cloudflare R2)',

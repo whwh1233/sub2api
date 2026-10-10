@@ -185,6 +185,7 @@
             <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
               {{ t('admin.backup.operations.description') }}
             </p>
+            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('admin.backup.scopeDescription') }}</p>
           </div>
           <div class="flex flex-wrap items-center gap-2">
             <div class="flex items-center gap-1">
@@ -230,6 +231,7 @@
                 </td>
                 <td class="py-3 pr-4 text-xs">
                   {{ record.file_name }}
+                  <div v-if="record.excluded_table_data?.includes('public.prompt_audit_events')" class="mt-1 text-gray-500 dark:text-gray-400" data-testid="backup-audit-excluded">{{ t('admin.backup.auditDataExcluded') }}</div>
                   <span v-if="record.monthly_archive" class="ml-1 inline-block rounded bg-primary-50 px-1.5 py-0.5 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300">{{ t('admin.backup.archive.badge') }}</span>
                   <div v-if="record.monthly_archive" class="mt-1 text-gray-500 dark:text-gray-400">{{ record.monthly_archive.dates.join(' / ') }}</div>
                 </td>
@@ -855,7 +857,11 @@ function closeDownloadParts() {
 }
 
 async function restoreBackup(id: string) {
-  if (!window.confirm(t('admin.backup.actions.restoreConfirm'))) return
+  const selectedBackup = backups.value.find(record => record.id === id)
+  const confirmKey = selectedBackup?.excluded_table_data?.includes('public.prompt_audit_events')
+    ? 'admin.backup.restoreWithoutAuditConfirm'
+    : 'admin.backup.actions.restoreConfirm'
+  if (!window.confirm(t(confirmKey))) return
   const password = window.prompt(t('admin.backup.actions.restorePasswordPrompt'))
   if (!password) return
   restoringId.value = id

@@ -232,6 +232,21 @@ old-process shutdown record from a new-process startup failure.
 
 ## 9. Rollback and cleanup
 
+Production backup scope (user instruction, 2026-10-10): retain the complete schema
+and all table data except `public.prompt_audit_events` rows. Use
+`--exclude-table-data=public.prompt_audit_events`, never `--exclude-table`, so the
+audit table and its constraints/indexes still restore. Users, balances, usage and
+billing records, settings, accounts, groups and audit jobs remain complete. This
+is not a ten-minute development sample. Audit history is intentionally unavailable
+after restoring this backup; do not call it an unqualified full-data backup.
+
+The October production database reached approximately 106 GiB, with audit events
+accounting for about 89 GiB. Scheduled backups using the 16 GiB `/tmp` tmpfs
+repeatedly failed with no space left. The server-local pre-upgrade backup excluding
+audit-event data was approximately 1.42 GiB in zstd directory format. Preserve a
+validated backup on disk and check staging capacity; do not rely on the old
+successful-full-dump size/time benchmarks for the expanded audit history.
+
 - Preserve `sub2api-linux.prev` until retention expires.
 - Binary rollback and database rollback are separate operations.
 - Do not assume old code plus the migrated primary database is a complete rollback.

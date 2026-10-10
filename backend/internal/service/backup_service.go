@@ -26,13 +26,17 @@ import (
 )
 
 const (
+	// BackupExcludedAuditEventTable keeps schema but omits prompt-audit history.
+	// Usage records, balances and all other table data remain included.
+	BackupExcludedAuditEventTable = "public.prompt_audit_events"
+
 	settingKeyBackupS3Config = "backup_s3_config"
 	settingKeyBackupSchedule = "backup_schedule"
 	settingKeyBackupRecords  = "backup_records"
 
 	backupObjectCleanupTimeout = 2 * time.Minute
 
-	// backupScheduledLeaderLockKey gates the scheduled full-database backup so
+	// backupScheduledLeaderLockKey gates the scheduled database backup so
 	// that only one instance in a clustered deployment performs the
 	// dump-and-upload each cycle. Without it every instance runs the cron
 	// independently, producing N concurrent pg_dumps against the same database,
@@ -120,24 +124,25 @@ type BackupScheduleConfig struct {
 
 // BackupRecord 备份记录
 type BackupRecord struct {
-	ID               string                `json:"id"`
-	Status           string                `json:"status"`      // pending, running, completed, failed
-	BackupType       string                `json:"backup_type"` // postgres
-	FileName         string                `json:"file_name"`
-	S3Key            string                `json:"s3_key"`
-	Parts            []BackupPart          `json:"parts,omitempty"`
-	SizeBytes        int64                 `json:"size_bytes"`
-	TriggeredBy      string                `json:"triggered_by"` // manual, scheduled
-	ErrorMsg         string                `json:"error_message,omitempty"`
-	StartedAt        string                `json:"started_at"`
-	FinishedAt       string                `json:"finished_at,omitempty"`
-	ExpiresAt        string                `json:"expires_at,omitempty"`     // 过期时间
-	Progress         string                `json:"progress,omitempty"`       // "dumping", "uploading", ""
-	RestoreStatus    string                `json:"restore_status,omitempty"` // "", "running", "completed", "failed"
-	RestoreStartedAt string                `json:"restore_started_at,omitempty"`
-	RestoreError     string                `json:"restore_error,omitempty"`
-	RestoredAt       string                `json:"restored_at,omitempty"`
-	MonthlyArchive   *BackupMonthlyArchive `json:"monthly_archive,omitempty"`
+	ExcludedTableData []string              `json:"excluded_table_data,omitempty"`
+	ID                string                `json:"id"`
+	Status            string                `json:"status"`      // pending, running, completed, failed
+	BackupType        string                `json:"backup_type"` // postgres
+	FileName          string                `json:"file_name"`
+	S3Key             string                `json:"s3_key"`
+	Parts             []BackupPart          `json:"parts,omitempty"`
+	SizeBytes         int64                 `json:"size_bytes"`
+	TriggeredBy       string                `json:"triggered_by"` // manual, scheduled
+	ErrorMsg          string                `json:"error_message,omitempty"`
+	StartedAt         string                `json:"started_at"`
+	FinishedAt        string                `json:"finished_at,omitempty"`
+	ExpiresAt         string                `json:"expires_at,omitempty"`     // 过期时间
+	Progress          string                `json:"progress,omitempty"`       // "dumping", "uploading", ""
+	RestoreStatus     string                `json:"restore_status,omitempty"` // "", "running", "completed", "failed"
+	RestoreStartedAt  string                `json:"restore_started_at,omitempty"`
+	RestoreError      string                `json:"restore_error,omitempty"`
+	RestoredAt        string                `json:"restored_at,omitempty"`
+	MonthlyArchive    *BackupMonthlyArchive `json:"monthly_archive,omitempty"`
 }
 
 // BackupDownloadPart 描述一个可下载的备份分卷。
@@ -642,14 +647,15 @@ func (s *BackupService) createBackup(ctx context.Context, triggeredBy string, ex
 	}
 
 	record := &BackupRecord{
-		ID:          backupID,
-		Status:      "running",
-		BackupType:  "postgres",
-		FileName:    fileName,
-		S3Key:       s3Key,
-		TriggeredBy: triggeredBy,
-		StartedAt:   now.Format(time.RFC3339),
-		ExpiresAt:   expiresAt,
+		ExcludedTableData: []string{BackupExcludedAuditEventTable},
+		ID:                backupID,
+		Status:            "running",
+		BackupType:        "postgres",
+		FileName:          fileName,
+		S3Key:             s3Key,
+		TriggeredBy:       triggeredBy,
+		StartedAt:         now.Format(time.RFC3339),
+		ExpiresAt:         expiresAt,
 	}
 
 	archivePath, sizeBytes, err := s.createCompressedBackupFile(ctx)
@@ -731,15 +737,16 @@ func (s *BackupService) StartBackup(ctx context.Context, triggeredBy string, exp
 	}
 
 	record := &BackupRecord{
-		ID:          backupID,
-		Status:      "running",
-		BackupType:  "postgres",
-		FileName:    fileName,
-		S3Key:       s3Key,
-		TriggeredBy: triggeredBy,
-		StartedAt:   now.Format(time.RFC3339),
-		ExpiresAt:   expiresAt,
-		Progress:    "pending",
+		ExcludedTableData: []string{BackupExcludedAuditEventTable},
+		ID:                backupID,
+		Status:            "running",
+		BackupType:        "postgres",
+		FileName:          fileName,
+		S3Key:             s3Key,
+		TriggeredBy:       triggeredBy,
+		StartedAt:         now.Format(time.RFC3339),
+		ExpiresAt:         expiresAt,
+		Progress:          "pending",
 	}
 
 	if err := s.saveRecord(ctx, record); err != nil {

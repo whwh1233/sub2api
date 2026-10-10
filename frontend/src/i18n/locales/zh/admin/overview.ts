@@ -83,7 +83,10 @@ export default {
 
     backup: {
       title: '数据库备份',
-      description: '全量数据库备份到 S3 兼容存储，支持定时备份与恢复',
+      description: '业务数据库备份到 S3 兼容存储，支持定时备份与恢复',
+      scopeDescription: '新备份保留用户、余额、使用记录及其他业务数据；提示词审计记录不备份，表结构保留。',
+      auditDataExcluded: '不含提示词审计记录',
+      restoreWithoutAuditConfirm: '确定要从此备份恢复吗？这将覆盖当前数据库，提示词审计记录将为空。',
       s3: {
         title: 'S3 存储配置',
         description: '配置 S3 兼容存储（支持 Cloudflare R2）',

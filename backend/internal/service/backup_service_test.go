@@ -567,6 +567,7 @@ func TestBackupService_StartBackup_SplitsCompressedArchive(t *testing.T) {
 	final, err := svc.GetBackupRecord(context.Background(), record.ID)
 	require.NoError(t, err)
 	require.Equal(t, "completed", final.Status)
+	require.Equal(t, []string{BackupExcludedAuditEventTable}, final.ExcludedTableData)
 	require.Greater(t, len(final.Parts), 1)
 	require.Empty(t, final.S3Key)
 }
@@ -722,6 +723,7 @@ func TestBackupService_RunScheduledBackup_LeaderElection(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, records, 1, "leader creates exactly one backup record")
 		require.Equal(t, "completed", records[0].Status)
+		require.Equal(t, []string{BackupExcludedAuditEventTable}, records[0].ExcludedTableData)
 		require.Empty(t, cache.heldBy(backupScheduledLeaderLockKey), "leader releases the lock when done")
 	})
 }

@@ -31,6 +31,7 @@ export interface BackupMonthlyArchive {
 }
 
 export interface BackupRecord {
+  excluded_table_data?: string[]
   id: string
   status: 'pending' | 'running' | 'completed' | 'failed'
   backup_type: string

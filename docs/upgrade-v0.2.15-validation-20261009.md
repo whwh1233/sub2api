@@ -6,7 +6,7 @@
 - Upstream release: `v0.2.15`, commit `f2669c8cf62555cd92389b3f55920e9e6e7c6ff2`.
 - Local branch: `codex/upgrade-v0.2.15-20261009`.
 - Backend VERSION and frontend package version are aligned to `0.2.15`; the upstream tag still carried backend VERSION `0.2.14`.
-- Production application/configuration were not changed. The user authorized the local staging/commit step on 2026-10-10; push, production pricing changes, deployment and restart remain separately confirmed release steps.
+- Merge validation did not change production. The user subsequently confirmed local commit, push, production max-pricing configuration and the server backup as separate steps. Application deployment and restart remain pending.
 
 ## Merge decisions
 
@@ -45,8 +45,8 @@ The release adds eight SQL migration files: OpenCode platform support, deletion 
 - Built through `deploy/local-build-push.ps1`, without flags.
 - Windows embedded candidate reports `0.2.15`; fresh-sample health (three times), HTML root, setup complete and all six referenced nonempty JS/CSS assets passed.
 - Linux gzip round trip passed.
-- Raw Linux SHA-256: `b3ed56cff47b5e8edbcaf5124257180d532f770425c491c6bdfcce46124ac24b`.
-- Compressed artifact: `backend/sub2api-linux.gz`, 38,944,288 bytes (approximately 37.1 MiB).
+- Current candidate raw Linux SHA-256 after the 2026-10-10 backup-policy change: `5f421556949b55b10484e80ed089362f4e80e1b93e796b3411cff397fd0157e9`.
+- Current compressed artifact: `backend/sub2api-linux.gz`, 38,944,076 bytes (approximately 37.1 MiB). The previously pushed `82707fa07` candidate used hash `b3ed56cff47b5e8edbcaf5124257180d532f770425c491c6bdfcce46124ac24b`; it must be superseded by the backup-policy follow-up before deployment.
 - The raw Linux executable is ignored and must not be committed.
 - The Linux/amd64 candidate executed in a local `postgres:17-alpine` Docker runtime against the same production-derived local PostgreSQL/Redis. Decompressed SHA matched; health (three times), HTML root, setup complete and all six referenced assets passed. The temporary runtime container was removed after verification.
 - Both platforms explicitly logged `Background workers disabled for local validation`.
@@ -55,20 +55,38 @@ The release adds eight SQL migration files: OpenCode platform support, deletion 
 
 ## Handoff
 
-This local merge commit packages the integrated code, validated compressed artifacts, explicit max-pricing plan and regression tests. Production remains at `076ba5e65` / v0.2.4 at the last read-only check. Remote push, the production pricing gate below, backups, deployment and completion checks still require confirmation in sequence.
+The original merge was committed and pushed as `82707fa07`. Its GitHub CI and Security Scan passed. This follow-up commit includes the user-requested backup policy and regenerated artifacts; the user confirmed the local commit on 2026-10-10. Pushing this follow-up still requires separate confirmation. Production remains at `076ba5e65` / v0.2.4. The pricing configuration and server backup steps below are complete; deployment/restart and completion checks remain separately confirmed steps.
 
 High-traffic release acceptance remains separate from the functional tests: no sustained production-load test or long-stream drain/cutover test was performed. The live shutdown path waits only five seconds for HTTP requests, and the normal deploy script restarts a single instance. The 2026-10-10 read-only check found a 106 GB production database and a burst of 403/429 error logs. The new migrations target much smaller tables, but the 49 MB development sample does not establish full-scale lock/backup/rollback timings. Do not interpret this commit as approval for an immediate high-traffic restart.
 
 ## Release behavior to review
 
-- Billing follow-up (2026-10-10): v0.2.4 implicitly applies an extra 3x multiplier to Claude Fable 5.1 at `max` reasoning effort. v0.2.15 removes that implicit default and only applies explicitly configured reasoning-effort multipliers. The user explicitly requested preserving the 3x tariff. `deploy/release-pricing-v0.2.15.json` records the legacy/new pricing cards and the three current Anthropic groups (7, 9, 47). The new card is installed only in the local production-derived database and preserves inherited token prices, group multipliers and long-context settings. Production pricing has not been changed.
-- Mandatory release gate: in a separately confirmed production step, review existing pricing and explicitly set the legacy Fable 5.1 `max_reasoning_effort_multiplier: 3` before replacing the old service. Migration 239 converts this to `reasoning_effort_multipliers: {"max": 3}`; verify the result before accepting traffic. Do not postpone this until after the new service starts. Merge rather than replace unrelated pricing cards and review any additional model aliases. Do not apply 3x to all models.
+- Billing follow-up (2026-10-10): v0.2.4 implicitly applies an extra 3x multiplier to Claude Fable 5.1 at `max` reasoning effort. v0.2.15 removes that implicit default and only applies explicitly configured reasoning-effort multipliers. The user explicitly requested preserving the 3x tariff. `deploy/release-pricing-v0.2.15.json` records the legacy/new pricing cards and the three current Anthropic groups (7, 9, 47). The new-format card is installed in the local production-derived database; the legacy-format explicit 3x card was separately authorized, installed and verified in production.
+- Mandatory release gate: recheck the explicit legacy Fable 5.1 `max_reasoning_effort_multiplier: 3` before replacing the old service. Migration 239 converts this to `reasoning_effort_multipliers: {"max": 3}`; verify the result before accepting traffic. Merge rather than replace unrelated pricing cards and review any additional model aliases. Do not apply 3x to all models.
 - Pricing regressions passed: the explicit Fable card preserves a reconciled max charge of $0.43480575 and leaves the high-effort equivalent at $0.14493525; the dated-model variant matches too. A separate Haiku 5.5 long-context case (132,534 input/context tokens, above the 100,000 threshold) retains its $0.1037384375 charge at group multiplier 1.25. Its catalog tier is 5x, independent of the Fable max multiplier. Disabling long-context pricing reduces that case to $0.0207476875 as expected. Evidence: `.local-run/upgrade-v0215-pricing-record-regression.log` and `backend/internal/service/billing_upgrade_tariff_test.go`.
 - API Key creation defaults: at most 200 active keys per user and 60 creations per hour, configurable.
 - In-flight balance reservation is enabled by default; low-balance concurrent requests can be rejected earlier.
 - Unused pre-upgrade password reset links become invalid.
 - EasyPay callback forgery protection and other upstream security fixes are included.
 - Migrations are forward-only; replacing the binary does not roll back the database.
+
+## Production preparation completed on 2026-10-10
+
+- Fable 5.1's explicit legacy max multiplier was installed through the production admin API for groups 7, 9 and 47. Their existing group multipliers (1.5, 0.3, 1.4), long-context flags and other fields were preserved. The API's unrelated empty Codex-manifest normalization was restored to its previous value with a guarded update. Original configuration backup: `/root/sub2api-release-backups/max-pricing-20261010T135458Z`.
+- The user revised production backup scope to omit `public.prompt_audit_events` data and later explicitly requested the same policy for automatic backups. The table's schema and every other table's complete data remain included.
+- Valid server backup: `/var/backups/sub2api-pre-upgrade-v0215-no-audit-20261010T142424Z` on `goodserver`; database archive is 1,522,872,682 bytes (approximately 1.42 GiB), covering 105 table schemas and 104 table-data entries. Export plus validation took 30.3 seconds. Application binary, config, active price catalog and service unit are also backed up privately.
+- The backup passed a complete archive-to-SQL read into `/dev/null` and independent SHA-256 verification of all 113 manifest entries. It was not restored into a full-sized test database. Manifest SHA-256: `e357cc43fddc3062129886d90caf85a2387f1fab77f1f2f328437d111286c301`.
+- The former all-data export at `/var/backups/sub2api-pre-upgrade-v0215-20261010T141334Z` was cancelled at the user's scope change. Its database archive is incomplete and MUST NOT be used for recovery. Approximately 27.9 GB of partial output remains pending separately authorized cleanup; no existing backup was deleted.
+- The same production process (PID 3529553) stayed active throughout, with no restart. The valid backup is on the same server; it has not been copied off-host.
+
+## Automatic backup policy follow-up
+
+- `PgDumper` now excludes only `public.prompt_audit_events` data for scheduled and manual application backups. No schema exclusion, time window or usage/balance filtering is applied.
+- New backup records persist `excluded_table_data`; the backup UI labels those records and explains that restoring them leaves prompt-audit history empty. Older records are not retroactively relabeled.
+- Repository backup-lock tests and backup-service tests passed. Frontend backup and locale tests passed (15 tests); relevant ESLint and Go static analysis passed.
+- A real local PostgreSQL dump/restore fixture verified exact balance and usage-cost preservation, audit-job/settings preservation, empty audit events, and retained audit-table foreign keys.
+- The official packaging script was rerun without flags. Windows and Linux candidates passed health, root HTML, setup and all six referenced assets; gzip round-trip verification passed. No new production data sample was taken for these iterations.
+- This application policy takes effect only after deployment of the new candidate. The running v0.2.4 automatic backup job still has its old behavior until then.
 
 ## Evidence
 

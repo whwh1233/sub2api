@@ -59,6 +59,7 @@ func (d *PgDumper) Dump(ctx context.Context) (io.ReadCloser, error) {
 		"--no-acl",
 		"--clean",
 		"--if-exists",
+		"--exclude-table-data=" + service.BackupExcludedAuditEventTable,
 	}
 
 	commandContext := d.commandContext

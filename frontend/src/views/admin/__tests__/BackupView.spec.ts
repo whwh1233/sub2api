@@ -108,6 +108,22 @@ describe('admin BackupView', () => {
     document.body.innerHTML = ''
   })
 
+  it('marks excluded audit history only on new scoped backups', async () => {
+    listBackups.mockResolvedValue({ items: [
+      baseRecord('legacy-full'),
+      { ...baseRecord('without-audit'), excluded_table_data: ['public.prompt_audit_events'] },
+    ] })
+    const wrapper = mountBackupView()
+    await flushPromises()
+    const rows = wrapper.findAll('tbody tr')
+    expect(rows[0].find('[data-testid="backup-audit-excluded"]').exists()).toBe(false)
+    expect(rows[1].find('[data-testid="backup-audit-excluded"]').text()).toBe('admin.backup.auditDataExcluded')
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
+    const restore = rows[1].findAll('button').find(button => button.text() === 'admin.backup.actions.restore')!
+    await restore.trigger('click')
+    expect(confirm).toHaveBeenCalledWith('admin.backup.restoreWithoutAuditConfirm')
+  })
+
   it.each(['backup', 'restore'])('does not resume %s polling after navigation during initial loading', async (operation) => {
     vi.useFakeTimers()
     let finish!: (value: object) => void
