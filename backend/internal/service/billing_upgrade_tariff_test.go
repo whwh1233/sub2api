@@ -21,7 +21,18 @@ func TestUpgradeFableExplicitMaxTariffPreservesCharge(t *testing.T) {
 	require.NoError(t, json.Unmarshal(raw, &plan))
 	bs := newTestBillingService()
 	resolver := NewModelPricingResolver(nil, bs)
-	group := &Group{ID: 7, LongContextPricingEnabled: true, ModelPricing: []ChannelModelPricing{plan.Card}}
+	group := &Group{ID: 7, RateMultiplier: 1.5, LongContextPricingEnabled: true, ModelPricing: []ChannelModelPricing{plan.Card}}
+	auth := &APIKeyService{}
+	apiKey := &APIKey{ID: 82, UserID: 40, GroupID: &group.ID, Status: StatusActive,
+		User: &User{ID: 40, Status: StatusActive}, Group: group}
+	payload, err := json.Marshal(&APIKeyAuthCacheEntry{Snapshot: auth.snapshotFromAPIKey(context.Background(), apiKey)})
+	require.NoError(t, err)
+	var cached APIKeyAuthCacheEntry
+	require.NoError(t, json.Unmarshal(payload, &cached))
+	materialized, used, err := auth.applyAuthCacheEntry("pricing-tariff-roundtrip", &cached)
+	require.NoError(t, err)
+	require.True(t, used)
+	group = materialized.Group
 	for _, tc := range []struct {
 		model, effort string
 		want          float64
@@ -33,7 +44,7 @@ func TestUpgradeFableExplicitMaxTariffPreservesCharge(t *testing.T) {
 		t.Run(tc.model+"/"+tc.effort, func(t *testing.T) {
 			cost, err := bs.CalculateCostUnified(CostInput{
 				Ctx: context.Background(), Model: tc.model, Group: group, GroupID: &group.ID,
-				ReasoningEffort: tc.effort, RateMultiplier: 1.5, Resolver: resolver,
+				ReasoningEffort: tc.effort, RateMultiplier: group.RateMultiplier, Resolver: resolver,
 				Tokens: UsageTokens{InputTokens: 506, OutputTokens: 12, CacheCreationTokens: 1011, CacheCreation5mTokens: 1011, CacheReadTokens: 313304},
 			})
 			require.NoError(t, err)

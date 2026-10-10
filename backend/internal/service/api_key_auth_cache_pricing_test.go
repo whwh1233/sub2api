@@ -21,6 +21,7 @@ func TestAPIKeyAuthSnapshotGroupPricingRoundtrip(t *testing.T) {
 			ModelPricing: []ChannelModelPricing{{
 				Models: []string{"claude-sonnet-*"}, BillingMode: BillingModeToken,
 				InputPrice: &inputPrice, OutputPrice: &outputPrice,
+				ReasoningEffortMultipliers: map[string]float64{"max": 3},
 			}},
 		},
 	}
@@ -47,4 +48,29 @@ func TestAPIKeyAuthSnapshotGroupPricingRoundtrip(t *testing.T) {
 	require.True(t, resolved.longContextPricingEnabled)
 	require.InDelta(t, inputPrice, resolved.BasePricing.InputPricePerToken, 1e-12)
 	require.InDelta(t, outputPrice, resolved.BasePricing.OutputPricePerToken, 1e-12)
+}
+
+func TestAPIKeyAuthSnapshotRejectsLegacyMaxPricing(t *testing.T) {
+	// A v0.2.4 Redis entry carries the old field. Decoding it into the new
+	// pricing type silently drops the multiplier; it must force a DB reload.
+	var cached APIKeyAuthCacheEntry
+	require.NoError(t, json.Unmarshal([]byte(`{
+	  "snapshot": {
+	    "version": 24,
+	    "api_key_id": 82,
+	    "user_id": 40,
+	    "group_id": 7,
+	    "status": "active",
+	    "user": {"id": 40, "status": "active"},
+	    "group": {"id": 7, "platform": "anthropic", "status": "active",
+	      "model_pricing": [{"models": ["claude-fable-5-1"], "billing_mode": "token", "max_reasoning_effort_multiplier": 3}]}
+	  }
+	}`), &cached))
+	require.NotNil(t, cached.Snapshot)
+	require.Empty(t, cached.Snapshot.Group.ModelPricing[0].ReasoningEffortMultipliers)
+	svc := &APIKeyService{}
+	key, used, err := svc.applyAuthCacheEntry("legacy-pricing-test", &cached)
+	require.NoError(t, err)
+	require.False(t, used, "legacy pricing must be reloaded from the migrated database")
+	require.Nil(t, key)
 }

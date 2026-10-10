@@ -45,8 +45,8 @@ The release adds eight SQL migration files: OpenCode platform support, deletion 
 - Built through `deploy/local-build-push.ps1`, without flags.
 - Windows embedded candidate reports `0.2.15`; fresh-sample health (three times), HTML root, setup complete and all six referenced nonempty JS/CSS assets passed.
 - Linux gzip round trip passed.
-- Current candidate raw Linux SHA-256 after the 2026-10-10 backup-policy change: `5f421556949b55b10484e80ed089362f4e80e1b93e796b3411cff397fd0157e9`.
-- Current compressed artifact: `backend/sub2api-linux.gz`, 38,944,076 bytes (approximately 37.1 MiB). The previously pushed `82707fa07` candidate used hash `b3ed56cff47b5e8edbcaf5124257180d532f770425c491c6bdfcce46124ac24b`; it must be superseded by the backup-policy follow-up before deployment.
+- Current candidate raw Linux SHA-256 after the 2026-10-10 pricing-cache compatibility fix: `9395dfa3f098a450b5b3393c9bb2873c92e31eeef361bc18f895ceb432fcdd2d`.
+- Current compressed artifact: `backend/sub2api-linux.gz`, 38,944,094 bytes (approximately 37.1 MiB). The pushed `772f9e455` backup-policy candidate used hash `5f421556949b55b10484e80ed089362f4e80e1b93e796b3411cff397fd0157e9`; it must be superseded by the pricing-cache compatibility fix before deployment.
 - The raw Linux executable is ignored and must not be committed.
 - The Linux/amd64 candidate executed in a local `postgres:17-alpine` Docker runtime against the same production-derived local PostgreSQL/Redis. Decompressed SHA matched; health (three times), HTML root, setup complete and all six referenced assets passed. The temporary runtime container was removed after verification.
 - Both platforms explicitly logged `Background workers disabled for local validation`.
@@ -55,7 +55,7 @@ The release adds eight SQL migration files: OpenCode platform support, deletion 
 
 ## Handoff
 
-The original merge was committed and pushed as `82707fa07`. Its GitHub CI and Security Scan passed. This follow-up commit includes the user-requested backup policy and regenerated artifacts; the user confirmed the local commit on 2026-10-10. Pushing this follow-up still requires separate confirmation. Production remains at `076ba5e65` / v0.2.4. The pricing configuration and server backup steps below are complete; deployment/restart and completion checks remain separately confirmed steps.
+The original merge (`82707fa07`) and backup-policy follow-up (`772f9e455`) were committed and pushed with confirmation. Both GitHub CI and Security Scan passed for `772f9e455`. A subsequent pre-deployment check reproduced a pricing-cache compatibility issue; this user-confirmed local follow-up commit contains the verified fix and rebuilt artifacts. Its push still requires confirmation. Production remains at `076ba5e65` / v0.2.4. Pricing configuration and the server backup are complete; deployment/restart and completion checks remain separately confirmed steps.
 
 High-traffic release acceptance remains separate from the functional tests: no sustained production-load test or long-stream drain/cutover test was performed. The live shutdown path waits only five seconds for HTTP requests, and the normal deploy script restarts a single instance. The 2026-10-10 read-only check found a 106 GB production database and a burst of 403/429 error logs. The new migrations target much smaller tables, but the 49 MB development sample does not establish full-scale lock/backup/rollback timings. Do not interpret this commit as approval for an immediate high-traffic restart.
 
@@ -87,6 +87,13 @@ High-traffic release acceptance remains separate from the functional tests: no s
 - A real local PostgreSQL dump/restore fixture verified exact balance and usage-cost preservation, audit-job/settings preservation, empty audit events, and retained audit-table foreign keys.
 - The official packaging script was rerun without flags. Windows and Linux candidates passed health, root HTML, setup and all six referenced assets; gzip round-trip verification passed. No new production data sample was taken for these iterations.
 - This application policy takes effect only after deployment of the new candidate. The running v0.2.4 automatic backup job still has its old behavior until then.
+
+## Pricing-cache compatibility follow-up
+
+- The old and upstream-new binaries both used API-key auth snapshot version 24, despite replacing the nested pricing field `max_reasoning_effort_multiplier` with `reasoning_effort_multipliers`. A persisted old Redis snapshot could therefore be accepted while silently losing the explicit max multiplier.
+- A regression fixture reproduced that acceptance before the fix. The candidate now uses snapshot version 25, rejecting old entries and causing the existing cache-miss path to reload migrated pricing from PostgreSQL. No production Redis keys were deleted or changed for this check.
+- The current-snapshot round trip retains the multiplier map, and the reconciled Fable tariff test now calculates its charge after JSON auth-cache serialization/deserialization. Auth-cache and Fable/Haiku pricing regressions passed; static analysis passed.
+- The official build script was rerun, gzip SHA verified, and both Windows and Linux candidates passed the complete frontend/startup gates. The local preview was restarted with this candidate. This fix is required before deploying the explicit max-pricing policy.
 
 ## Evidence
 
