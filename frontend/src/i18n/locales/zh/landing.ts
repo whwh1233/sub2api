@@ -5,6 +5,8 @@ export default {
   },
   // Home Page
   home: {
+    pauseAnimation: '暂停动画',
+    playAnimation: '播放动画',
     viewOnGithub: '在 GitHub 上查看',
     viewDocs: '查看文档',
     docs: '文档',

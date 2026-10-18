@@ -50,13 +50,15 @@ function mountHome(settings: Record<string, unknown> = {}) {
         RouterLink: RouterLinkStub,
         LocaleSwitcher: { template: '<div data-testid="locale-switcher" />' },
         Icon: { template: '<span data-testid="icon" />' },
+        NeuralFlowHero: { template: '<section data-testid="neural-flow-hero"><slot /></section>' },
       },
     },
   })
 }
 
 function compactDestination(wrapper: ReturnType<typeof mountHome>) {
-  return wrapper.get('[data-testid="compact-home"]').findComponent(RouterLinkStub).props('to')
+  return wrapper.get('[data-testid="compact-home"]').findAllComponents(RouterLinkStub)
+    .find((link) => ['/login', '/dashboard', '/admin/dashboard'].includes(link.props('to')))?.props('to')
 }
 
 function modelPlazaDestination(wrapper: ReturnType<typeof mountHome>) {
@@ -108,7 +110,7 @@ describe('HomeView compact mode', () => {
     const wrapper = mountHome(settings)
 
     expect(wrapper.find('[data-testid="compact-home"]').exists()).toBe(false)
-    expect(wrapper.find('.terminal-container').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="neural-flow-hero"]').exists()).toBe(true)
   })
 
   it('links unauthenticated visitors to login', () => {

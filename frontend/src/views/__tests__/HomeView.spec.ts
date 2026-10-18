@@ -94,27 +94,25 @@ describe('HomeView default marketing copy', () => {
     })
   })
 
-  it('renders the default provider lineup and gateway example', () => {
+  it('renders an immersive hero with the configured branding and primary entry', () => {
     const wrapper = mount(HomeView, {
       global: {
         stubs: {
           RouterLink: { template: '<a><slot /></a>' },
           LocaleSwitcher: true,
           Icon: true,
+          NeuralFlowHero: { template: '<section data-testid="neural-flow-hero"><slot /></section>' },
         },
       },
     })
 
     const text = wrapper.text()
 
-    expect(text).toContain('MODEL LINEUP')
-    expect(text).toContain('ChatGPT')
-    expect(text).toContain('Claude')
-    expect(text).toContain('Gemini')
-    expect(text).toContain('Antigravity')
-    expect(text).toContain('/v1/messages')
-    expect(text).toContain('Routing to upstream...')
-    expect(text).toContain('200 OK')
+    expect(text).toContain('CloseAI')
+    expect(text).not.toContain('MODEL LINEUP')
+    expect(text).not.toContain('一键接入')
+    expect(wrapper.find('[data-testid="neural-flow-hero"]').exists()).toBe(true)
+    expect(text).toContain('立即开始')
 
     wrapper.unmount()
   })

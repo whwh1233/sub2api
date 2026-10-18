@@ -5,6 +5,8 @@ export default {
   },
   // Home Page
   home: {
+    pauseAnimation: 'Pause animation',
+    playAnimation: 'Play animation',
     viewOnGithub: 'View on GitHub',
     viewDocs: 'View Documentation',
     docs: 'Docs',
