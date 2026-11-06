@@ -93,7 +93,7 @@ const appStore = useAppStore()
 // Site settings - directly from appStore (already initialized from injected config)
 const siteName = computed(
   () =>
-    appStore.cachedPublicSettings?.site_name || appStore.siteName || 'Sub2API',
+    appStore.cachedPublicSettings?.site_name || appStore.siteName || 'CloseAI',
 )
 const siteLogo = computed(() =>
   sanitizeUrl(
